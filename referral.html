@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashPerp — Referrals</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:#05070a; --surface:#090d12; --panel:#0d1219; --raised:#111820;
+    --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.12);
+    --green:#00e87a; --red:#ff4060; --amber:#ffaa00; --blue:#00aaff;
+    --text:#e8edf2; --text2:#6b7a8d; --text3:#3a4655;
+    --mono:'Space Mono',monospace; --sans:'Space Grotesk',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);color:var(--text);font-family:var(--sans);min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,232,122,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,232,122,0.015) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+  *{position:relative;z-index:1}
+
+  nav{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(5,7,10,0.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--green);text-decoration:none}
+  .logo-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .nav-links{display:flex;gap:24px}
+  .nav-links a{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text2);text-decoration:none;transition:color 0.15s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-links a.active{color:var(--green)}
+  .connect-btn{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:var(--green);color:var(--void);border:none;padding:8px 18px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px));transition:background 0.15s}
+  .connect-btn:hover{background:#00ff88}
+  .connect-btn.connected{background:transparent;color:var(--green);border:1px solid rgba(0,232,122,0.4);clip-path:none}
+
+  .page{max-width:900px;margin:0 auto;padding:40px 24px}
+
+  .page-tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--green);margin-bottom:12px}
+  .page-title{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-1px;line-height:1.1;margin-bottom:12px}
+  .page-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:500px;margin-bottom:40px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--border);padding:24px}
+  .sec-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  /* Stats */
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:24px}
+  .stat-cell{background:var(--panel);padding:18px 16px}
+  .stat-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+  .stat-val{font-family:var(--mono);font-size:26px;font-weight:700}
+  .stat-val.g{color:var(--green)}
+  .stat-val.a{color:var(--amber)}
+
+  /* Code box */
+  .code-display{background:var(--raised);border:1px solid rgba(0,232,122,0.3);padding:20px 24px;text-align:center;margin-bottom:16px}
+  .code-text{font-family:var(--mono);font-size:36px;font-weight:700;letter-spacing:8px;color:var(--green);margin-bottom:8px}
+  .code-sub{font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:1px}
+
+  .link-box{background:var(--raised);border:1px solid var(--border2);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .link-text{font-family:var(--mono);font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:12px}
+  .copy-btn{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:transparent;border:1px solid var(--border2);color:var(--text3);padding:5px 12px;cursor:pointer;transition:all 0.12s;flex-shrink:0}
+  .copy-btn:hover{border-color:var(--green);color:var(--green)}
+  .copy-btn.copied{border-color:var(--green);color:var(--green)}
+
+  /* Register form */
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .field-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+  .field-row{display:flex;gap:1px}
+  .field-input{flex:1;background:var(--raised);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;padding:12px 14px;outline:none;transition:border-color 0.15s;text-transform:uppercase;letter-spacing:4px}
+  .field-input:focus{border-color:var(--green)}
+  .field-input::placeholder{color:var(--text3);font-size:14px;letter-spacing:1px;text-transform:none}
+  .field-hint{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:0.5px}
+
+  .action-btn{width:100%;padding:13px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:pointer;border:none;background:var(--green);color:var(--void);clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));transition:background 0.15s;margin-bottom:8px}
+  .action-btn:hover{background:#00ff88}
+  .action-btn:disabled{opacity:0.3;cursor:not-allowed;clip-path:none}
+  .action-btn.secondary{background:transparent;color:var(--amber);border:1px solid rgba(255,170,0,0.4);clip-path:none}
+  .action-btn.secondary:hover{background:rgba(255,170,0,0.1)}
+
+  /* Apply code */
+  .apply-section{background:var(--raised);border:1px solid var(--border);padding:20px;margin-bottom:24px}
+  .referrer-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.2);padding:8px 14px;font-family:var(--mono);font-size:12px;color:var(--green)}
+
+  /* How it works */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:24px}
+  .step{background:var(--panel);padding:20px 16px}
+  .step-num{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--green);margin-bottom:8px}
+  .step-title{font-family:var(--mono);font-size:12px;font-weight:700;margin-bottom:6px}
+  .step-desc{font-size:12px;color:var(--text2);line-height:1.6}
+
+  /* Info rows */
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .info-row:last-child{border-bottom:none}
+  .info-label{color:var(--text2);font-family:var(--mono);font-size:10px}
+  .info-val{font-family:var(--mono);font-weight:700}
+  .info-val.g{color:var(--green)}
+  .info-val.a{color:var(--amber)}
+
+  .overlay{position:fixed;inset:0;background:rgba(5,7,10,0.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:900}
+  .overlay.on{display:flex}
+  .spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .overlay-msg{font-family:var(--mono);font-size:12px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--raised);border-left:3px solid var(--green);color:var(--text);font-family:var(--mono);font-size:11px;padding:12px 18px;z-index:999;max-width:360px;transform:translateY(60px);opacity:0;transition:all 0.25s}
+  .toast.on{transform:translateY(0);opacity:1}
+  .toast.err{border-left-color:var(--red)}
+
+  @media(max-width:768px){.grid2,.steps{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo"><div class="logo-dot"></div>FlashPerp</a>
+  <div class="nav-links">
+    <a href="flashperp-warroom.html">Trade</a>
+    <a href="earn.html">Earn</a>
+    <a href="referral.html" class="active">Refer</a>
+    <a href="stats.html">Stats</a>
+  </div>
+  <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect</button>
+</nav>
+
+<div class="page">
+  <div class="page-tag">// Referral Program</div>
+  <h1 class="page-title">Refer traders.<br><span style="color:var(--green)">Earn forever.</span></h1>
+  <p class="page-sub">Get a unique referral code. Share it. Earn 10% of every borrow fee your referrals pay — forever, on every trade.</p>
+
+  <!-- How it works -->
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-title">Get Your Code</div>
+      <div class="step-desc">Register a unique referral code — your name, brand, anything you want.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-title">Share It</div>
+      <div class="step-desc">Share your referral link on Twitter, Discord, or anywhere. Referee gets 5% fee discount.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-title">They Trade</div>
+      <div class="step-desc">Every time your referee opens a flash position, 10% of their borrow fee goes to you.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-title">Claim USDC</div>
+      <div class="step-desc">Rewards accumulate on-chain. Claim any time, directly to your wallet.</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-grid" id="statsGrid" style="display:none">
+    <div class="stat-cell">
+      <div class="stat-label">Your Referrals</div>
+      <div class="stat-val g" id="statReferrals">0</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Pending Rewards</div>
+      <div class="stat-val a" id="statPending">$0</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Total Earned</div>
+      <div class="stat-val g" id="statEarned">$0</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- LEFT: Your referral code -->
+    <div class="card">
+      <div class="sec-title">Your Referral Code</div>
+
+      <!-- No code yet -->
+      <div id="noCodeSection">
+        <div class="field">
+          <div class="field-label">Choose Your Code</div>
+          <input type="text" class="field-input" id="codeInput" placeholder="e.g. NEXTON" maxlength="12" oninput="this.value=this.value.toUpperCase()">
+          <div class="field-hint">3-12 characters · letters and numbers only · permanent</div>
+        </div>
+        <button class="action-btn" id="registerBtn" onclick="registerCode()" disabled>Connect Wallet First</button>
+      </div>
+
+      <!-- Has code -->
+      <div id="hasCodeSection" style="display:none">
+        <div class="code-display">
+          <div class="code-text" id="myCode">—</div>
+          <div class="code-sub">Your permanent referral code</div>
+        </div>
+
+        <div class="link-box">
+          <div class="link-text" id="referralLink">—</div>
+          <button class="copy-btn" id="copyLinkBtn" onclick="copyLink()">Copy</button>
+        </div>
+
+        <div class="link-box">
+          <div class="link-text" id="tweetText">—</div>
+          <button class="copy-btn" onclick="copyTweet()">Tweet</button>
+        </div>
+
+        <div style="margin-top:16px">
+          <div class="info-row"><span class="info-label">Referrer Share</span><span class="info-val g">10% of borrow fee</span></div>
+          <div class="info-row"><span class="info-label">Referee Discount</span><span class="info-val g">5% off borrow fee</span></div>
+          <div class="info-row"><span class="info-label">Duration</span><span class="info-val">Forever</span></div>
+        </div>
+
+        <button class="action-btn secondary" id="claimBtn" onclick="claimRewards()" style="margin-top:16px" disabled>No Rewards to Claim</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Apply a referral code -->
+    <div class="card">
+      <div class="sec-title">Apply a Referral Code</div>
+
+      <div id="noReferrerSection">
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px">
+          Have a referral code from a friend? Apply it before trading to get <span style="color:var(--green)">5% off all borrow fees</span>.
+        </p>
+        <div class="field">
+          <div class="field-label">Enter Code</div>
+          <div class="field-row">
+            <input type="text" class="field-input" id="applyCodeInput" placeholder="e.g. NEXTON" maxlength="12" oninput="this.value=this.value.toUpperCase()" style="font-size:22px">
+          </div>
+        </div>
+        <button class="action-btn" id="applyBtn" onclick="applyCode()" disabled>Connect Wallet First</button>
+        <div class="field-hint" style="margin-top:8px">One-time action. Cannot be changed after applying.</div>
+      </div>
+
+      <div id="hasReferrerSection" style="display:none">
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">You are referred by:</p>
+        <div class="referrer-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e87a" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="referrerAddr">—</span>
+        </div>
+        <div style="margin-top:20px">
+          <div class="info-row"><span class="info-label">Your Discount</span><span class="info-val g">5% off borrow fees</span></div>
+          <div class="info-row"><span class="info-label">Status</span><span class="info-val g">Active</span></div>
+          <div class="info-row"><span class="info-label">Applied</span><span class="info-val">Permanent</span></div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--raised);border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.7">
+          Your 5% discount is automatically applied on every flash position you open.
+        </div>
+      </div>
+
+      <!-- Protocol stats -->
+      <div style="margin-top:24px">
+        <div class="sec-title">Protocol Referral Stats</div>
+        <div class="info-row"><span class="info-label">Total Referrers</span><span class="info-val" id="protoReferrers">—</span></div>
+        <div class="info-row"><span class="info-label">Total Referrals</span><span class="info-val" id="protoReferrals">—</span></div>
+        <div class="info-row"><span class="info-label">Rewards Paid</span><span class="info-val g" id="protoRewards">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="spinner"></div><div class="overlay-msg" id="overlayMsg">Processing...</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const RPC_URL = 'https://arb-mainnet.g.alchemy.com/v2/KZEFKPM5lG0ewvC1izG6b';
+const CHAIN_ID = 42161;
+
+// NOTE: Deploy ReferralSystem.sol and update this address
+const REFERRAL_ADDR = '0x2996b983c0956C313322103Ba5d41B217F1b8582';
+
+const REFERRAL_ABI = [
+  'function registerCode(string calldata code) external',
+  'function applyCode(string calldata code) external',
+  'function claimRewards() external',
+  'function getMyCode(address) view returns (string)',
+  'function getReferrer(address) view returns (address)',
+  'function getStats(address) view returns (uint256,uint256,uint256,uint256)',
+  'function pendingRewards(address) view returns (uint256)',
+  'function totalReferrers() view returns (uint256)',
+  'function totalReferrals() view returns (uint256)',
+  'function totalRewardsPaid() view returns (uint256)',
+  'function isCodeTaken(string) view returns (bool)',
+];
+
+let provider, signer, userAddr, C = {};
+const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+
+async function connectWallet() {
+  if (!window.ethereum) { toast('MetaMask not found', 'err'); return; }
+  try {
+    showOverlay('Connecting...');
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    userAddr = await signer.getAddress();
+
+    const net = await provider.getNetwork();
+    if (Number(net.chainId) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + CHAIN_ID.toString(16) }] });
+      } catch {
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x' + CHAIN_ID.toString(16), chainName: 'Arbitrum One', rpcUrls: [RPC_URL], nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }] });
+      }
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      userAddr = await signer.getAddress();
+    }
+
+    if (REFERRAL_ADDR !== '0x2996b983c0956C313322103Ba5d41B217F1b8582') {
+      C.ref = new ethers.Contract(REFERRAL_ADDR, REFERRAL_ABI, signer);
+    }
+
+    const short = userAddr.slice(0,6) + '...' + userAddr.slice(-4);
+    document.getElementById('connectBtn').textContent = short;
+    document.getElementById('connectBtn').classList.add('connected');
+    document.getElementById('registerBtn').disabled = false;
+    document.getElementById('registerBtn').textContent = '⚡ Register Code';
+    document.getElementById('applyBtn').disabled = false;
+    document.getElementById('applyBtn').textContent = 'Apply Code';
+
+    hideOverlay();
+    toast('Connected: ' + short);
+    if (C.ref) await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e.message?.slice(0,80) || 'Failed', 'err');
+  }
+}
+
+async function refreshAll() {
+  if (!C.ref) return;
+  try {
+    const [myCode, referrer, stats, totalRef, totalReferrals, totalPaid] = await Promise.all([
+      C.ref.getMyCode(userAddr),
+      C.ref.getReferrer(userAddr),
+      C.ref.getStats(userAddr),
+      C.ref.totalReferrers(),
+      C.ref.totalReferrals(),
+      C.ref.totalRewardsPaid(),
+    ]);
+
+    // My code
+    if (myCode && myCode.length > 0) {
+      document.getElementById('noCodeSection').style.display = 'none';
+      document.getElementById('hasCodeSection').style.display = 'block';
+      document.getElementById('statsGrid').style.display = 'grid';
+
+      set('myCode', myCode);
+      const link = `${window.location.origin}/flashperp-warroom.html?ref=${myCode}`;
+      set('referralLink', link);
+      document.getElementById('referralLink').textContent = link;
+
+      const tweet = `Trading on FlashPerp — no collateral perps on Arbitrum. Use my code ${myCode} for 5% off fees! ${link}`;
+      document.getElementById('tweetText').textContent = tweet;
+
+      // Stats
+      const [referrals, volume, rewards, pending] = stats;
+      set('statReferrals', referrals.toString());
+      set('statPending', '$' + parseFloat(ethers.formatUnits(pending, 6)).toFixed(2));
+      set('statEarned', '$' + parseFloat(ethers.formatUnits(rewards, 6)).toFixed(2));
+
+      const claimBtn = document.getElementById('claimBtn');
+      if (pending > 0n) {
+        claimBtn.disabled = false;
+        claimBtn.textContent = 'Claim $' + parseFloat(ethers.formatUnits(pending, 6)).toFixed(2) + ' USDC';
+        claimBtn.className = 'action-btn';
+      }
+    }
+
+    // My referrer
+    if (referrer && referrer !== ethers.ZeroAddress) {
+      document.getElementById('noReferrerSection').style.display = 'none';
+      document.getElementById('hasReferrerSection').style.display = 'block';
+      set('referrerAddr', referrer.slice(0,6) + '...' + referrer.slice(-4));
+    }
+
+    // Protocol stats
+    set('protoReferrers', totalRef.toString());
+    set('protoReferrals', totalReferrals.toString());
+    set('protoRewards', '$' + parseFloat(ethers.formatUnits(totalPaid, 6)).toFixed(2));
+
+  } catch(e) { console.error(e); }
+}
+
+async function registerCode() {
+  const code = document.getElementById('codeInput').value.trim();
+  if (code.length < 3) { toast('Code must be at least 3 characters', 'err'); return; }
+  if (!C.ref) { toast('Referral contract not deployed yet', 'err'); return; }
+  try {
+    showOverlay('Registering code...');
+    const tx = await C.ref.registerCode(code, { gasLimit: 200000 });
+    await tx.wait();
+    hideOverlay();
+    toast('Code "' + code.toUpperCase() + '" registered! ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || e?.message?.slice(0,80) || 'Failed', 'err');
+  }
+}
+
+async function applyCode() {
+  const code = document.getElementById('applyCodeInput').value.trim();
+  if (!code) { toast('Enter a referral code', 'err'); return; }
+  if (!C.ref) { toast('Referral contract not deployed yet', 'err'); return; }
+  try {
+    showOverlay('Applying code...');
+    const tx = await C.ref.applyCode(code, { gasLimit: 200000 });
+    await tx.wait();
+    hideOverlay();
+    toast('Referral code applied! You now get 5% off fees ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || e?.message?.slice(0,80) || 'Failed', 'err');
+  }
+}
+
+async function claimRewards() {
+  if (!C.ref) return;
+  try {
+    showOverlay('Claiming rewards...');
+    const tx = await C.ref.claimRewards({ gasLimit: 200000 });
+    await tx.wait();
+    hideOverlay();
+    toast('Rewards claimed to your wallet ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || 'Claim failed', 'err');
+  }
+}
+
+function copyLink() {
+  const link = document.getElementById('referralLink').textContent;
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyTweet() {
+  const tweet = document.getElementById('tweetText').textContent;
+  const url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweet);
+  window.open(url, '_blank');
+}
+
+let toastTimer;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = 'toast', 4000);
+}
+function showOverlay(msg) { set('overlayMsg', msg); document.getElementById('overlay').classList.add('on'); }
+function hideOverlay() { document.getElementById('overlay').classList.remove('on'); }
+</script>
+</body>
+</html>

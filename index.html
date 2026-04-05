@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashPerp — Flash Liquidity Perpetuals</title>
+<meta name="description" content="Borrow. Trade. Settle. No collateral. Positions expire in minutes. The first flash liquidity perpetual protocol on Arbitrum.">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:   #05070a;
+    --surface:#090d12;
+    --panel:  #0d1219;
+    --border: rgba(255,255,255,0.06);
+    --border2:rgba(255,255,255,0.12);
+    --green:  #00e87a;
+    --red:    #ff4060;
+    --amber:  #ffaa00;
+    --cyan:   #00d4ff;
+    --text:   #e8edf2;
+    --text2:  #6b7a8d;
+    --text3:  #3a4655;
+    --mono:   'Space Mono', monospace;
+    --sans:   'Space Grotesk', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--void); color: var(--text); font-family: var(--sans); overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,232,122,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(0,232,122,0.018) 1px, transparent 1px);
+    background-size: 48px 48px; pointer-events: none; z-index: 0;
+  }
+  * { position: relative; z-index: 1; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px; background: rgba(5,7,10,0.92);
+    border-bottom: 1px solid var(--border); backdrop-filter: blur(12px);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--green); text-decoration: none; }
+  .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.8)} }
+  .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+  .nav-links a { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text2); text-decoration: none; transition: color 0.15s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; background: var(--green); color: var(--void); border: none; padding: 9px 20px; cursor: pointer; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); transition: background 0.15s; text-decoration: none; display: inline-block; }
+  .nav-cta:hover { background: #00ff88; }
+
+  .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 40px 80px; text-align: center; }
+  .hero-tag { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--green); border: 1px solid rgba(0,232,122,0.3); padding: 6px 16px; margin-bottom: 32px; display: inline-block; animation: fadeIn 0.6s ease both; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .hero-title { font-family: var(--mono); font-size: clamp(40px, 7vw, 88px); font-weight: 700; line-height: 1.05; letter-spacing: -2px; margin-bottom: 24px; animation: fadeIn 0.7s ease 0.1s both; }
+  .hero-title .accent { color: var(--green); }
+  .hero-title .dim { color: var(--text3); }
+  .hero-sub { font-size: clamp(16px, 2vw, 20px); color: var(--text2); line-height: 1.7; max-width: 560px; margin: 0 auto 48px; animation: fadeIn 0.7s ease 0.2s both; }
+  .hero-sub strong { color: var(--text); }
+  .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; animation: fadeIn 0.7s ease 0.3s both; }
+  .btn-primary { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; background: var(--green); color: var(--void); border: none; padding: 14px 32px; cursor: pointer; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); transition: background 0.15s; text-decoration: none; display: inline-block; }
+  .btn-primary:hover { background: #00ff88; }
+  .btn-secondary { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; background: transparent; color: var(--text2); border: 1px solid var(--border2); padding: 14px 32px; cursor: pointer; transition: all 0.15s; text-decoration: none; display: inline-block; }
+  .btn-secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
+
+  .hero-ticker { margin-top: 64px; width: 100%; display: flex; gap: 2px; animation: fadeIn 0.7s ease 0.4s both; }
+  .ticker-card { flex: 1; background: var(--panel); border: 1px solid var(--border); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+  .ticker-card-sym { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--text3); }
+  .ticker-card-price { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .ticker-card-chg { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+  .ticker-card-chg.up { color: var(--green); }
+  .ticker-card-chg.dn { color: var(--red); }
+
+  .section { padding: 100px 40px; max-width: 1100px; margin: 0 auto; }
+  .section-tag { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--green); margin-bottom: 16px; }
+  .section-title { font-family: var(--mono); font-size: clamp(28px, 4vw, 44px); font-weight: 700; letter-spacing: -1px; line-height: 1.1; margin-bottom: 16px; }
+  .section-sub { font-size: 17px; color: var(--text2); line-height: 1.7; max-width: 560px; margin-bottom: 64px; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+  .step { background: var(--panel); border: 1px solid var(--border); padding: 28px 24px; position: relative; overflow: hidden; }
+  .step::before { content: attr(data-n); position: absolute; top: -10px; right: 16px; font-family: var(--mono); font-size: 80px; font-weight: 700; color: rgba(255,255,255,0.03); line-height: 1; pointer-events: none; }
+  .step-num { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--green); margin-bottom: 16px; }
+  .step-title { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; color: var(--text); }
+  .step-desc { font-size: 13px; color: var(--text2); line-height: 1.7; }
+
+  .stats-band { background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 48px 40px; }
+  .stats-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); }
+  .stat-item { background: var(--panel); padding: 32px 28px; display: flex; flex-direction: column; gap: 8px; }
+  .stat-val { font-family: var(--mono); font-size: 36px; font-weight: 700; color: var(--green); letter-spacing: -1px; }
+  .stat-label { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); }
+  .stat-desc { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .compare-card { background: var(--panel); border: 1px solid var(--border); padding: 32px 28px; }
+  .compare-card.highlight { border-color: rgba(0,232,122,0.3); background: rgba(0,232,122,0.04); }
+  .compare-label { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 20px; padding: 4px 10px; display: inline-block; }
+  .compare-label.old { color: var(--text3); background: var(--surface); }
+  .compare-label.new { color: var(--green); background: rgba(0,232,122,0.1); border: 1px solid rgba(0,232,122,0.25); }
+  .compare-title { font-family: var(--mono); font-size: 20px; font-weight: 700; margin-bottom: 24px; letter-spacing: -0.5px; }
+  .compare-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); line-height: 1.5; }
+  .compare-item:last-child { border-bottom: none; }
+  .ci-bad { color: var(--red); flex-shrink: 0; }
+  .ci-good { color: var(--green); flex-shrink: 0; }
+
+  .markets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .market-card { background: var(--panel); border: 1px solid var(--border); padding: 24px 20px; transition: border-color 0.15s; }
+  .market-card.live { border-color: rgba(0,232,122,0.2); }
+  .market-card.soon { opacity: 0.5; }
+  .mc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .mc-sym { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+  .mc-badge { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 2px; padding: 3px 8px; }
+  .mc-badge.live { color: var(--green); background: rgba(0,232,122,0.1); border: 1px solid rgba(0,232,122,0.25); }
+  .mc-badge.soon { color: var(--text3); background: var(--surface); border: 1px solid var(--border); }
+  .mc-type { font-size: 11px; color: var(--text3); font-family: var(--mono); letter-spacing: 1px; margin-bottom: 10px; }
+  .mc-detail { font-size: 12px; color: var(--text2); }
+
+  .cta-section { padding: 120px 40px; text-align: center; background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .cta-title { font-family: var(--mono); font-size: clamp(32px, 5vw, 56px); font-weight: 700; letter-spacing: -1px; line-height: 1.1; margin-bottom: 20px; }
+  .cta-sub { font-size: 17px; color: var(--text2); max-width: 480px; margin: 0 auto 48px; line-height: 1.7; }
+
+  footer { padding: 40px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .footer-logo { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--green); }
+  .footer-links { display: flex; gap: 28px; list-style: none; }
+  .footer-links a { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); text-decoration: none; transition: color 0.15s; }
+  .footer-links a:hover { color: var(--text2); }
+  .footer-copy { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 1px; }
+
+  @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .hero { padding: 80px 20px 60px; }
+    .hero-ticker { flex-direction: column; }
+    .section { padding: 60px 20px; }
+    .steps { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .markets-grid { grid-template-columns: 1fr; }
+    footer { flex-direction: column; gap: 20px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo"><div class="nav-dot"></div>FlashPerp</a>
+  <ul class="nav-links">
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#markets">Markets</a></li>
+    <li><a href="#protocol">Protocol</a></li>
+    <li><a href="flashperp-warroom.html">App ↗</a></li>
+  </ul>
+  <a href="flashperp-warroom.html" class="nav-cta">Launch App</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-tag">⬡ Testnet Live · Arbitrum</div>
+  <h1 class="hero-title">
+    Borrow.<br>
+    <span class="accent">Trade.</span><br>
+    <span class="dim">Settle.</span>
+  </h1>
+  <p class="hero-sub">
+    The first <strong>flash liquidity perpetual protocol</strong>.
+    No collateral. No waiting. Open leveraged positions in seconds, auto-settle in minutes.
+  </p>
+  <div class="hero-actions">
+    <a href="flashperp-warroom.html" class="btn-primary">⚡ Open a Position</a>
+    <a href="#how" class="btn-secondary">How It Works</a>
+  </div>
+  <div class="hero-ticker">
+    <div class="ticker-card">
+      <div class="ticker-card-sym">BTC/USD</div>
+      <div class="ticker-card-price" id="lp-btc">Loading...</div>
+      <div class="ticker-card-chg up" id="lc-btc">—</div>
+    </div>
+    <div class="ticker-card">
+      <div class="ticker-card-sym">ETH/USD</div>
+      <div class="ticker-card-price" id="lp-eth">Loading...</div>
+      <div class="ticker-card-chg" id="lc-eth">—</div>
+    </div>
+    <div class="ticker-card">
+      <div class="ticker-card-sym">SOL/USD</div>
+      <div class="ticker-card-price" id="lp-sol">Loading...</div>
+      <div class="ticker-card-chg" id="lc-sol">—</div>
+    </div>
+    <div class="ticker-card">
+      <div class="ticker-card-sym">POOL TVL</div>
+      <div class="ticker-card-price">$500K</div>
+      <div class="ticker-card-chg up">SEEDED</div>
+    </div>
+    <div class="ticker-card">
+      <div class="ticker-card-sym">MAX LEVERAGE</div>
+      <div class="ticker-card-price">10x</div>
+      <div class="ticker-card-chg up">NO COLLATERAL</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="section-tag">// How It Works</div>
+  <h2 class="section-title">Four steps.<br>Under five minutes.</h2>
+  <p class="section-sub">FlashPerp combines uncollateralised flash lending with time-bounded perpetual trading into a single tight loop.</p>
+  <div class="steps">
+    <div class="step" data-n="01">
+      <div class="step-num">01</div>
+      <div class="step-title">BORROW</div>
+      <div class="step-desc">Borrow up to 80% of pool liquidity instantly. No collateral required. A 0.3% borrow fee is charged at open.</div>
+    </div>
+    <div class="step" data-n="02">
+      <div class="step-num">02</div>
+      <div class="step-title">TRADE</div>
+      <div class="step-desc">Open a long or short with up to 10x leverage. Entry price locked via Pyth Network sub-second oracle.</div>
+    </div>
+    <div class="step" data-n="03">
+      <div class="step-num">03</div>
+      <div class="step-title">WAIT</div>
+      <div class="step-desc">Your position runs for 1 minute to 1 hour. The risk engine monitors your health factor in real time.</div>
+    </div>
+    <div class="step" data-n="04">
+      <div class="step-num">04</div>
+      <div class="step-title">SETTLE</div>
+      <div class="step-desc">At expiry the position auto-settles. Profit goes to you. Principal returns to the pool. Zero manual steps.</div>
+    </div>
+  </div>
+</section>
+
+<div class="stats-band">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-val">$0</div>
+      <div class="stat-label">Collateral Required</div>
+      <div class="stat-desc">Open positions with zero upfront capital. The pool backs every trade.</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val">10x</div>
+      <div class="stat-label">Max Leverage</div>
+      <div class="stat-desc">Up to 10x on all markets. Configurable per market by creators.</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val">60s</div>
+      <div class="stat-label">Min Duration</div>
+      <div class="stat-desc">The fastest perp positions in DeFi. Trade in the time it takes to make a coffee.</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val">∞</div>
+      <div class="stat-label">Markets</div>
+      <div class="stat-desc">Anyone can create a market. Crypto, forex, commodities — any Pyth feed.</div>
+    </div>
+  </div>
+</div>
+
+<section class="section" id="protocol">
+  <div class="section-tag">// Why FlashPerp</div>
+  <h2 class="section-title">DeFi perps.<br>Reimagined.</h2>
+  <p class="section-sub">Existing perpetual protocols require capital, create indefinite risk, and lock you into slow settlement. FlashPerp flips the model.</p>
+  <div class="compare-grid">
+    <div class="compare-card">
+      <div class="compare-label old">Traditional Perps</div>
+      <div class="compare-title">dYdX / GMX / Hyperliquid</div>
+      <div class="compare-item"><span class="ci-bad">✕</span><span>Requires upfront collateral to open any position</span></div>
+      <div class="compare-item"><span class="ci-bad">✕</span><span>Positions run indefinitely — funding rates accumulate</span></div>
+      <div class="compare-item"><span class="ci-bad">✕</span><span>New markets require governance votes and upgrades</span></div>
+      <div class="compare-item"><span class="ci-bad">✕</span><span>Oracle manipulation risk over longer time horizons</span></div>
+      <div class="compare-item"><span class="ci-bad">✕</span><span>Capital locked until manually closed</span></div>
+    </div>
+    <div class="compare-card highlight">
+      <div class="compare-label new">FlashPerp</div>
+      <div class="compare-title">Flash Liquidity Perps</div>
+      <div class="compare-item"><span class="ci-good">✓</span><span>Zero collateral — borrow from pool, repay at settlement</span></div>
+      <div class="compare-item"><span class="ci-good">✓</span><span>Hard expiry — 1 minute to 1 hour, then auto-settled</span></div>
+      <div class="compare-item"><span class="ci-good">✓</span><span>Permissionless markets — anyone deploys in one transaction</span></div>
+      <div class="compare-item"><span class="ci-good">✓</span><span>Sub-second Pyth oracles — manipulation unfeasible in minutes</span></div>
+      <div class="compare-item"><span class="ci-good">✓</span><span>Automatic settlement — no manual action required at expiry</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="markets">
+  <div class="section-tag">// Markets</div>
+  <h2 class="section-title">Trade anything.<br>Create anything.</h2>
+  <p class="section-sub">Start with crypto majors. Expand to forex, commodities, equities. Any Pyth oracle feed is a potential market.</p>
+  <div class="markets-grid">
+    <div class="market-card live">
+      <div class="mc-header"><div class="mc-sym">BTC/USD</div><div class="mc-badge live">LIVE</div></div>
+      <div class="mc-type">CRYPTO · 5MIN · 1HR</div>
+      <div class="mc-detail">Bitcoin perpetual. 1–60 min durations. Up to 10x leverage.</div>
+    </div>
+    <div class="market-card live">
+      <div class="mc-header"><div class="mc-sym">ETH/USD</div><div class="mc-badge live">LIVE</div></div>
+      <div class="mc-type">CRYPTO · 5MIN</div>
+      <div class="mc-detail">Ethereum perpetual. 1–5 min durations. Up to 10x leverage.</div>
+    </div>
+    <div class="market-card live">
+      <div class="mc-header"><div class="mc-sym">SOL/USD</div><div class="mc-badge live">LIVE</div></div>
+      <div class="mc-type">CRYPTO · 5MIN</div>
+      <div class="mc-detail">Solana perpetual. 1–5 min durations. Up to 10x leverage.</div>
+    </div>
+    <div class="market-card soon">
+      <div class="mc-header"><div class="mc-sym">EUR/USD</div><div class="mc-badge soon">SOON</div></div>
+      <div class="mc-type">FOREX · 5MIN</div>
+      <div class="mc-detail">Euro/Dollar perpetual via Pyth forex feed.</div>
+    </div>
+    <div class="market-card soon">
+      <div class="mc-header"><div class="mc-sym">XAU/USD</div><div class="mc-badge soon">SOON</div></div>
+      <div class="mc-type">COMMODITY · 5MIN</div>
+      <div class="mc-detail">Gold perpetual. Trade the oldest safe haven asset on-chain.</div>
+    </div>
+    <div class="market-card soon">
+      <div class="mc-header"><div class="mc-sym">SPX/USD</div><div class="mc-badge soon">SOON</div></div>
+      <div class="mc-type">EQUITY · 5MIN</div>
+      <div class="mc-detail">S&P 500 perpetual. DeFi access to TradFi's benchmark index.</div>
+    </div>
+  </div>
+</section>
+
+<div class="cta-section">
+  <h2 class="cta-title">Ready to flash<br><span style="color:var(--green)">trade?</span></h2>
+  <p class="cta-sub">FlashPerp testnet is live. No collateral. No waiting. Open your first position in under 60 seconds.</p>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+    <a href="flashperp-warroom.html" class="btn-primary">⚡ Launch App</a>
+    <a href="FlashPerp_Whitepaper.docx" class="btn-secondary">Read Whitepaper</a>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo">FlashPerp</div>
+  <ul class="footer-links">
+    <li><a href="#how">Docs</a></li>
+    <li><a href="#protocol">Protocol</a></li>
+    <li><a href="flashperp-warroom.html">App</a></li>
+    <li><a href="#">Twitter</a></li>
+    <li><a href="#">Discord</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 FlashPerp · Testnet · Not Financial Advice</div>
+</footer>
+
+<script>
+
+
+
+
+async function fetchLivePrices() {
+  try {
+    const symbols = ['BTCUSDT','ETHUSDT','SOLUSDT'];
+    const results = await Promise.all(
+      symbols.map(s => fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=' + s).then(r => r.json()))
+    );
+    const btc = parseFloat(results[0].lastPrice);
+    const eth = parseFloat(results[1].lastPrice);
+    const sol = parseFloat(results[2].lastPrice);
+    const btcChg = parseFloat(results[0].priceChangePercent);
+    const ethChg = parseFloat(results[1].priceChangePercent);
+    const solChg = parseFloat(results[2].priceChangePercent);
+    const fmt = n => '$' + Number(n).toLocaleString('en-US', {maximumFractionDigits: 0});
+    const fmtPct = n => (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
+
+    // Landing page elements
+    if (document.getElementById('lp-btc')) {
+      document.getElementById('lp-btc').textContent = fmt(btc);
+      document.getElementById('lp-eth').textContent = fmt(eth);
+      document.getElementById('lp-sol').textContent = fmt(sol);
+      const lb = document.getElementById('lc-btc');
+      const le = document.getElementById('lc-eth');
+      const ls = document.getElementById('lc-sol');
+      if (lb) { lb.textContent = fmtPct(btcChg); lb.className = 'ticker-card-chg ' + (btcChg >= 0 ? 'up' : 'dn'); }
+      if (le) { le.textContent = fmtPct(ethChg); le.className = 'ticker-card-chg ' + (ethChg >= 0 ? 'up' : 'dn'); }
+      if (ls) { ls.textContent = fmtPct(solChg); ls.className = 'ticker-card-chg ' + (solChg >= 0 ? 'up' : 'dn'); }
+    }
+
+    // War room state
+    if (typeof S !== 'undefined') {
+      S.prices['BTC/USD'] = btc;
+      S.prices['ETH/USD'] = eth;
+      S.prices['SOL/USD'] = sol;
+      S.price = S.prices[S.mkt] || btc;
+      if (S.hist.length < 10) {
+        S.hist = [];
+        for (let i = 0; i < 90; i++) S.hist.push(S.price * (1 + (Math.random()-0.5)*0.005));
+      }
+      updatePriceUI();
+      drawChart();
+      buildAlertScroll();
+    }
+    console.log('Live prices — BTC:$' + btc.toFixed(0) + ' ETH:$' + eth.toFixed(0) + ' SOL:$' + sol.toFixed(2));
+  } catch(e) {
+    console.warn('Price fetch failed:', e.message);
+  }
+}
+
+fetchLivePrices();
+setInterval(fetchLivePrices, 15000);
+
+</script>
+</body>
+</html>

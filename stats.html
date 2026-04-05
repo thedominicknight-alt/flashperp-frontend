@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashPerp — Stats</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:#05070a; --surface:#090d12; --panel:#0d1219; --raised:#111820;
+    --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.12);
+    --green:#00e87a; --red:#ff4060; --amber:#ffaa00; --blue:#00aaff;
+    --text:#e8edf2; --text2:#6b7a8d; --text3:#3a4655;
+    --mono:'Space Mono',monospace; --sans:'Space Grotesk',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,232,122,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,232,122,0.015) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+  *{position:relative;z-index:1}
+
+  nav{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(5,7,10,0.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--green);text-decoration:none}
+  .logo-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .nav-links{display:flex;gap:24px}
+  .nav-links a{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text2);text-decoration:none;transition:color 0.15s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-links a.active{color:var(--green)}
+
+  .page{max-width:1200px;margin:0 auto;padding:32px 24px}
+
+  .page-title{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text3);margin-bottom:24px;display:flex;align-items:center;gap:12px}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+
+  /* HERO STATS */
+  .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:24px}
+  .hero-stat{background:var(--panel);padding:24px 20px;display:flex;flex-direction:column;gap:6px}
+  .hero-stat-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3)}
+  .hero-stat-val{font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:-1px}
+  .hero-stat-val.g{color:var(--green)}
+  .hero-stat-val.a{color:var(--amber)}
+  .hero-stat-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
+
+  /* GRID */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:24px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--border);padding:20px}
+  .card-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .card-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  /* MARKET CARDS */
+  .market-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .market-row:last-child{border-bottom:none}
+  .market-name{font-family:var(--mono);font-weight:700;font-size:13px}
+  .market-badge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border:1px solid rgba(0,232,122,0.3);color:var(--green)}
+  .market-stat{font-family:var(--mono);font-size:12px;color:var(--text2);text-align:right}
+  .market-stat span{display:block;color:var(--text);font-weight:700}
+
+  /* TRADE TABLE */
+  .trade-table{width:100%;border-collapse:collapse;font-size:12px}
+  .trade-table th{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+  .trade-table td{padding:10px 10px;border-bottom:1px solid rgba(30,42,53,0.5);color:var(--text2)}
+  .trade-table tr:hover td{background:rgba(255,255,255,0.02)}
+  .dir-long{color:var(--green);font-family:var(--mono);font-weight:700;font-size:10px;padding:2px 6px;background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.2)}
+  .dir-short{color:var(--red);font-family:var(--mono);font-weight:700;font-size:10px;padding:2px 6px;background:rgba(255,64,96,0.08);border:1px solid rgba(255,64,96,0.2)}
+  .pnl-pos{color:var(--green);font-family:var(--mono);font-weight:700}
+  .pnl-neg{color:var(--red);font-family:var(--mono);font-weight:700}
+  .liq-badge{color:var(--red);font-family:var(--mono);font-size:9px;border:1px solid rgba(255,64,96,0.3);padding:1px 5px;margin-left:4px}
+
+  /* POOL STATS */
+  .pool-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .pool-row:last-child{border-bottom:none}
+  .pool-label{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.5px}
+  .pool-val{font-family:var(--mono);font-size:13px;font-weight:700}
+  .pool-val.g{color:var(--green)}
+  .pool-val.a{color:var(--amber)}
+
+  /* UTIL BAR */
+  .util-track{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
+  .util-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber));transition:width 1s}
+
+  /* LEADERBOARD */
+  .lb-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+  .lb-row:last-child{border-bottom:none}
+  .lb-rank{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text3);width:24px;flex-shrink:0}
+  .lb-rank.top{color:var(--amber)}
+  .lb-addr{font-family:var(--mono);font-size:11px;color:var(--text2);flex:1}
+  .lb-trades{font-family:var(--mono);font-size:11px;color:var(--text3);width:60px;text-align:center}
+  .lb-pnl{font-family:var(--mono);font-size:13px;font-weight:700;text-align:right}
+
+  /* CHART */
+  .chart-wrap{height:180px;position:relative}
+
+  /* REFRESH */
+  .refresh-btn{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:transparent;border:1px solid var(--border2);color:var(--text3);padding:6px 14px;cursor:pointer;transition:all 0.15s}
+  .refresh-btn:hover{border-color:var(--green);color:var(--green)}
+
+  .loading{color:var(--text3);font-family:var(--mono);font-size:11px;text-align:center;padding:24px;letter-spacing:1px}
+
+  @media(max-width:768px){.hero-stats{grid-template-columns:1fr 1fr}.grid2,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo"><div class="logo-dot"></div>FlashPerp</a>
+  <div class="nav-links">
+    <a href="flashperp-warroom.html">App</a>
+    <a href="stats.html" class="active">Stats</a>
+    <a href="index.html">Home</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-title"><div class="live-dot"></div>Protocol Statistics — Live</div>
+
+  <!-- Hero Stats -->
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-label">Total Volume</div>
+      <div class="hero-stat-val g" id="statVolume">—</div>
+      <div class="hero-stat-sub">All time</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Total Trades</div>
+      <div class="hero-stat-val" id="statTrades">—</div>
+      <div class="hero-stat-sub">Settled + liquidated</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Pool TVL</div>
+      <div class="hero-stat-val g" id="statTVL">—</div>
+      <div class="hero-stat-sub">Total liquidity</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Utilisation</div>
+      <div class="hero-stat-val a" id="statUtil">—</div>
+      <div class="hero-stat-sub">Of pool borrowed</div>
+    </div>
+  </div>
+
+  <!-- Row 1 -->
+  <div class="grid2">
+    <!-- Pool Intel -->
+    <div class="card">
+      <div class="card-title">Pool Intel</div>
+      <div class="pool-row"><span class="pool-label">Total Deposits</span><span class="pool-val g" id="poolDeposits">—</span></div>
+      <div class="pool-row"><span class="pool-label">Available Liquidity</span><span class="pool-val" id="poolAvail">—</span></div>
+      <div class="pool-row"><span class="pool-label">Currently Borrowed</span><span class="pool-val a" id="poolBorrowed">—</span></div>
+      <div class="pool-row"><span class="pool-label">Max Borrowable</span><span class="pool-val" id="poolMax">—</span></div>
+      <div class="pool-row">
+        <span class="pool-label">Utilisation</span>
+        <span class="pool-val a" id="poolUtil2">—</span>
+      </div>
+      <div class="util-track"><div class="util-fill" id="utilBar" style="width:0%"></div></div>
+      <div class="pool-row" style="margin-top:8px"><span class="pool-label">Insurance Fund</span><span class="pool-val g">Active</span></div>
+      <div class="pool-row"><span class="pool-label">Est. LP APY</span><span class="pool-val g">18.4%</span></div>
+    </div>
+
+    <!-- Volume Chart -->
+    <div class="card">
+      <div class="card-title">Trade Volume — Last 20 Trades</div>
+      <div class="chart-wrap">
+        <canvas id="volumeChart"></canvas>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-family:var(--mono);font-size:10px;color:var(--text3)">
+        <span>Total P&L: <span id="totalPnl" style="color:var(--green)">—</span></span>
+        <span>Liq rate: <span id="liqRate" style="color:var(--red)">—</span></span>
+        <span>Avg size: <span id="avgSize" style="color:var(--text)">—</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="grid2">
+    <!-- Markets -->
+    <div class="card">
+      <div class="card-title">Active Markets</div>
+      <div id="marketsList"><div class="loading">Loading markets...</div></div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="card">
+      <div class="card-title">Top Traders — P&L</div>
+      <div id="leaderboard"><div class="loading">Loading leaderboard...</div></div>
+    </div>
+  </div>
+
+  <!-- Recent Trades -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Recent Trades</span>
+      <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="trade-table">
+        <thead>
+          <tr>
+            <th>Market</th><th>Direction</th><th>Size</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Time</th><th>Tx</th>
+          </tr>
+        </thead>
+        <tbody id="recentTrades">
+          <tr><td colspan="8"><div class="loading">Loading trades...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Protocol Info -->
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title">Protocol</div>
+      <div class="pool-row"><span class="pool-label">Network</span><span class="pool-val g">Arbitrum</span></div>
+      <div class="pool-row"><span class="pool-label">Version</span><span class="pool-val">v1.0 Testnet</span></div>
+      <div class="pool-row"><span class="pool-label">Oracle</span><span class="pool-val">Pyth Network</span></div>
+      <div class="pool-row"><span class="pool-label">Max Leverage</span><span class="pool-val">20x</span></div>
+      <div class="pool-row"><span class="pool-label">Borrow Fee</span><span class="pool-val">0.30%</span></div>
+      <div class="pool-row"><span class="pool-label">Liq. Reward</span><span class="pool-val">0.50%</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Security</div>
+      <div class="pool-row"><span class="pool-label">Util. Ceiling</span><span class="pool-val">80%</span></div>
+      <div class="pool-row"><span class="pool-label">Insurance Fund</span><span class="pool-val g">Active</span></div>
+      <div class="pool-row"><span class="pool-label">Keeper Network</span><span class="pool-val g">Online</span></div>
+      <div class="pool-row"><span class="pool-label">Reentrancy Guard</span><span class="pool-val g">Yes</span></div>
+      <div class="pool-row"><span class="pool-label">Audit Status</span><span class="pool-val a">Pending</span></div>
+      <div class="pool-row"><span class="pool-label">Bug Bounty</span><span class="pool-val a">Soon</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Links</div>
+      <div class="pool-row"><span class="pool-label">Twitter</span><span class="pool-val" style="color:var(--blue)">@FlashPerpFi</span></div>
+      <div class="pool-row"><span class="pool-label">Discord</span><span class="pool-val" style="color:var(--blue)">discord.gg/flashperp</span></div>
+      <div class="pool-row"><span class="pool-label">GitHub</span><span class="pool-val" style="color:var(--blue)">soon</span></div>
+      <div class="pool-row"><span class="pool-label">Whitepaper</span><span class="pool-val" style="color:var(--blue)">FlashPerp_Whitepaper.docx</span></div>
+      <div class="pool-row"><span class="pool-label">App</span><span class="pool-val g">Live</span></div>
+      <div class="pool-row"><span class="pool-label">Mainnet</span><span class="pool-val a">Coming Soon</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RPC = 'https://arb-mainnet.g.alchemy.com/v2/KZEFKPM5lG0ewvC1izG6b';
+const INDEXER = 'http://localhost:3001';
+
+const POOL_ADDR = '0xBF3b8A480CCc90aF756Af179F7D11092eE746EA1';
+const FACTORY_ADDR = '0x65b6C0Af5fd3DD8125c35eE88943a9994fFF90f3';
+
+const POOL_ABI = [
+  'function totalDeposits() view returns (uint256)',
+  'function totalBorrowed() view returns (uint256)',
+  'function availableLiquidity() view returns (uint256)',
+  'function utilisationRate() view returns (uint256)',
+  'function maxBorrowable() view returns (uint256)',
+];
+
+const FACTORY_ABI = [
+  'function allMarkets() view returns (bytes32[])',
+  'function getMarket(bytes32) view returns (tuple(bytes32 id,string name,bytes32 oracleMarketId,uint256 minDuration,uint256 maxDuration,uint256 maxLeverage,uint256 creationFee,address creator,bool active,uint256 createdAt))',
+];
+
+let provider, pool, factory;
+let tradesData = [];
+
+const fmt = n => '$' + Number(ethers.formatUnits(n, 6)).toLocaleString('en-US', {maximumFractionDigits: 0});
+const fmtPct = n => (Number(n) / 1e16).toFixed(1) + '%';
+const short = addr => addr.slice(0,6) + '...' + addr.slice(-4);
+
+async function init() {
+  provider = new ethers.JsonRpcProvider(RPC);
+  pool     = new ethers.Contract(POOL_ADDR, POOL_ABI, provider);
+  factory  = new ethers.Contract(FACTORY_ADDR, FACTORY_ABI, provider);
+}
+
+async function loadPoolStats() {
+  try {
+    const [dep, borr, avail, util, maxB] = await Promise.all([
+      pool.totalDeposits(), pool.totalBorrowed(),
+      pool.availableLiquidity(), pool.utilisationRate(), pool.maxBorrowable(),
+    ]);
+    const utilPct = (Number(util) / 1e16).toFixed(1);
+    document.getElementById('statTVL').textContent    = fmt(dep);
+    document.getElementById('statUtil').textContent   = utilPct + '%';
+    document.getElementById('poolDeposits').textContent = fmt(dep);
+    document.getElementById('poolAvail').textContent  = fmt(avail);
+    document.getElementById('poolBorrowed').textContent = fmt(borr);
+    document.getElementById('poolMax').textContent    = fmt(maxB);
+    document.getElementById('poolUtil2').textContent  = utilPct + '%';
+    document.getElementById('utilBar').style.width    = Math.min(parseFloat(utilPct), 100) + '%';
+  } catch(e) { console.error('Pool stats:', e); }
+}
+
+async function loadMarkets() {
+  try {
+    const ids = await factory.allMarkets();
+    const markets = await Promise.all(ids.map(id => factory.getMarket(id)));
+    const el = document.getElementById('marketsList');
+    el.innerHTML = markets.map(m => `
+      <div class="market-row">
+        <div>
+          <div class="market-name">${m.name}</div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:3px">${Number(m.minDuration)/60}min – ${Number(m.maxDuration)/60}min</div>
+        </div>
+        <div class="market-stat">
+          <span>${Number(m.maxLeverage)/1e18}x max</span>
+          ${m.active ? '<span class="market-badge" style="display:inline-block;margin-top:4px">LIVE</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error('Markets:', e); }
+}
+
+async function loadTrades() {
+  try {
+    const res = await fetch(INDEXER + '/trades');
+    const data = await res.json();
+    tradesData = data.trades || [];
+
+    // Hero stats
+    const totalVol = tradesData.reduce((sum, t) => sum + parseFloat(t.size || 0), 0);
+    document.getElementById('statVolume').textContent = '$' + totalVol.toLocaleString('en-US', {maximumFractionDigits: 0});
+    document.getElementById('statTrades').textContent = tradesData.length;
+
+    // P&L stats
+    const totalPnl = tradesData.reduce((sum, t) => sum + parseFloat(t.pnl || 0), 0);
+    const liqCount = tradesData.filter(t => t.type === 'liquidated').length;
+    const liqRate  = tradesData.length ? ((liqCount / tradesData.length) * 100).toFixed(1) : 0;
+    const avgSize  = tradesData.length ? totalVol / tradesData.length : 0;
+
+    document.getElementById('totalPnl').textContent = (totalPnl >= 0 ? '+' : '') + '$' + Math.abs(totalPnl).toLocaleString('en-US', {maximumFractionDigits: 0});
+    document.getElementById('liqRate').textContent  = liqRate + '%';
+    document.getElementById('avgSize').textContent  = '$' + avgSize.toLocaleString('en-US', {maximumFractionDigits: 0});
+
+    // Recent trades table
+    const tbody = document.getElementById('recentTrades');
+    if (!tradesData.length) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="loading">No trades yet</div></td></tr>';
+    } else {
+      tbody.innerHTML = tradesData.slice(0, 20).map(t => {
+        const pnl = parseFloat(t.pnl) || 0;
+        const size = parseFloat(t.size) || 0;
+        const entry = parseFloat(t.entryPrice) || 0;
+        const exit = parseFloat(t.exitPrice) || 0;
+        const liqBadge = t.type === 'liquidated' ? '<span class="liq-badge">LIQ</span>' : '';
+        const time = new Date(t.timestamp).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+        const txLink = t.tx ? `<a href="#" style="color:var(--blue);font-family:var(--mono);font-size:10px">${t.tx.slice(0,10)}...</a>` : '—';
+        return `<tr>
+          <td style="font-family:var(--mono);font-weight:700">${t.market || '?'}</td>
+          <td><span class="${t.isLong ? 'dir-long' : 'dir-short'}">${t.isLong ? 'LONG' : 'SHORT'}</span>${liqBadge}</td>
+          <td style="font-family:var(--mono)">$${size.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
+          <td style="font-family:var(--mono);color:var(--text2)">$${entry.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          <td style="font-family:var(--mono);color:var(--text2)">${exit > 0 ? '$'+exit.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+          <td><span class="${pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</span></td>
+          <td style="color:var(--text3);font-size:11px;font-family:var(--mono)">${time}</td>
+          <td>${txLink}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Leaderboard
+    const traders = {};
+    tradesData.forEach(t => {
+      const addr = t.trader || 'unknown';
+      if (!traders[addr]) traders[addr] = { trades: 0, pnl: 0, vol: 0 };
+      traders[addr].trades++;
+      traders[addr].pnl += parseFloat(t.pnl) || 0;
+      traders[addr].vol += parseFloat(t.size) || 0;
+    });
+
+    const sorted = Object.entries(traders).sort((a,b) => b[1].pnl - a[1].pnl).slice(0, 8);
+    const lb = document.getElementById('leaderboard');
+    if (!sorted.length) {
+      lb.innerHTML = '<div class="loading">No traders yet</div>';
+    } else {
+      lb.innerHTML = sorted.map(([addr, d], i) => `
+        <div class="lb-row">
+          <div class="lb-rank ${i < 3 ? 'top' : ''}">${i === 0 ? '①' : i === 1 ? '②' : i === 2 ? '③' : '#' + (i+1)}</div>
+          <div class="lb-addr">${short(addr)}</div>
+          <div class="lb-trades">${d.trades}t</div>
+          <div class="lb-pnl ${d.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${d.pnl >= 0 ? '+' : ''}$${Math.abs(d.pnl).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+        </div>
+      `).join('');
+    }
+
+    // Volume chart
+    drawVolumeChart();
+
+  } catch(e) {
+    console.error('Trades:', e);
+    document.getElementById('recentTrades').innerHTML = '<tr><td colspan="8"><div class="loading">Indexer offline — run node indexer.js</div></td></tr>';
+  }
+}
+
+function drawVolumeChart() {
+  const canvas = document.getElementById('volumeChart');
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+
+  const recent = tradesData.slice(0, 20).reverse();
+  const labels = recent.map((_, i) => '#' + (i + 1));
+  const sizes  = recent.map(t => parseFloat(t.size) || 0);
+  const colors = recent.map(t => t.isLong ? 'rgba(0,232,122,0.7)' : 'rgba(255,64,96,0.7)');
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: sizes,
+        backgroundColor: colors,
+        borderWidth: 0,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: {
+          label: ctx => '$' + ctx.raw.toLocaleString('en-US', {maximumFractionDigits: 0})
+        }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#3a4655', font: { family: 'Space Mono', size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#3a4655', font: { family: 'Space Mono', size: 10 }, callback: v => '$' + (v/1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
+}
+
+async function loadAll() {
+  await Promise.all([loadPoolStats(), loadMarkets(), loadTrades()]);
+}
+
+init().then(loadAll);
+setInterval(loadAll, 15000);
+</script>
+</body>
+</html>

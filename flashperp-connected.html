@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashPerp — Flash Liquidity Perpetuals</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080b0f;
+    --bg2:       #0d1117;
+    --bg3:       #111820;
+    --border:    #1e2a35;
+    --border2:   #243040;
+    --green:     #00ff88;
+    --red:       #ff3b5c;
+    --amber:     #ffb800;
+    --blue:      #00aaff;
+    --text:      #e2eaf2;
+    --text2:     #8899aa;
+    --text3:     #445566;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); pointer-events: none; z-index: 999; }
+
+  /* HEADER */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; border-bottom: 1px solid var(--border); background: rgba(8,11,15,0.95); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; }
+  .logo-icon { width: 28px; height: 28px; background: var(--green); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); animation: pulse-logo 2s ease-in-out infinite; }
+  @keyframes pulse-logo { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+  .logo span { color: var(--green); }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .network-badge { font-size: 11px; color: var(--green); border: 1px solid rgba(0,255,136,0.3); padding: 4px 12px; display: none; }
+  .wallet-info { font-size: 11px; color: var(--text2); display: none; }
+  .connect-btn { background: transparent; border: 1px solid var(--green); color: var(--green); font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 8px 20px; cursor: pointer; letter-spacing: 1px; transition: all 0.2s; text-transform: uppercase; }
+  .connect-btn:hover { background: var(--green); color: var(--bg); box-shadow: 0 0 20px rgba(0,255,136,0.3); }
+  .connect-btn.connected { border-color: var(--green); color: var(--green); }
+
+  /* STATUS BAR */
+  .status-bar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 8px 28px; display: flex; gap: 32px; font-size: 11px; color: var(--text2); }
+  .status-item { display: flex; gap: 8px; align-items: center; }
+  .status-val { color: var(--text); font-weight: 600; }
+  .status-val.green { color: var(--green); }
+  .status-val.amber { color: var(--amber); }
+
+  /* MARKET BAR */
+  .market-bar { background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; padding: 0 24px; }
+  .market-tab { padding: 14px 20px; font-size: 12px; font-weight: 600; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; letter-spacing: 0.5px; }
+  .market-tab:hover { color: var(--text2); }
+  .market-tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  /* MAIN */
+  .app { display: grid; grid-template-columns: 1fr 380px; gap: 1px; background: var(--border); min-height: calc(100vh - 130px); }
+  .panel { background: var(--bg); padding: 24px; }
+
+  /* PRICE */
+  .price-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+  .current-price { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: -1px; }
+  .price-change { font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 2px; }
+  .price-change.up { color: var(--green); background: rgba(0,255,136,0.1); }
+  .price-change.dn { color: var(--red); background: rgba(255,59,92,0.1); }
+
+  /* CHART */
+  .chart-container { position: relative; background: var(--bg2); border: 1px solid var(--border); height: 200px; overflow: hidden; margin-bottom: 20px; }
+  canvas#priceChart { width: 100%; height: 100%; }
+  .chart-label { position: absolute; top: 12px; right: 12px; font-size: 10px; color: var(--text3); letter-spacing: 1px; }
+
+  /* SECTION */
+  .section-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* POOL STATS */
+  .pool-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 20px; }
+  .pool-stat { background: var(--bg2); padding: 14px 16px; }
+  .pool-stat-label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); margin-bottom: 4px; }
+  .pool-stat-val { font-size: 16px; font-weight: 700; }
+  .pool-stat-val.green { color: var(--green); }
+  .pool-stat-val.amber { color: var(--amber); }
+  .util-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .util-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber)); transition: width 1s; }
+
+  /* POSITIONS TABLE */
+  .positions-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .positions-table th { text-align: left; color: var(--text3); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .positions-table td { padding: 12px 10px; border-bottom: 1px solid rgba(30,42,53,0.5); color: var(--text2); }
+  .positions-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .pos-long { color: var(--green); font-weight: 600; }
+  .pos-short { color: var(--red); font-weight: 600; }
+  .pos-profit { color: var(--green); }
+  .pos-loss { color: var(--red); }
+  .countdown { font-weight: 700; font-size: 13px; padding: 3px 8px; border: 1px solid; display: inline-block; min-width: 64px; text-align: center; }
+  .countdown.normal { color: var(--amber); border-color: rgba(255,184,0,0.3); }
+  .countdown.warning { color: var(--red); border-color: rgba(255,59,92,0.4); animation: flash 0.5s infinite; }
+  .countdown.done { color: var(--text3); border-color: var(--border); }
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .close-btn { background: transparent; border: 1px solid var(--border2); color: var(--text3); font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; }
+  .close-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* ORDER FORM */
+  .order-panel { display: flex; flex-direction: column; gap: 18px; }
+  .dir-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg2); padding: 4px; border: 1px solid var(--border); }
+  .dir-btn { padding: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px; cursor: pointer; border: none; transition: all 0.15s; text-transform: uppercase; background: transparent; color: var(--text3); }
+  .dir-btn.long.active { background: rgba(0,255,136,0.12); color: var(--green); box-shadow: inset 0 0 0 1px rgba(0,255,136,0.3); }
+  .dir-btn.short.active { background: rgba(255,59,92,0.12); color: var(--red); box-shadow: inset 0 0 0 1px rgba(255,59,92,0.3); }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); display: flex; justify-content: space-between; }
+  .form-label span { color: var(--text2); }
+  .input-wrap { display: flex; gap: 1px; }
+  .form-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; padding: 12px 14px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .form-input:focus { border-color: var(--green); }
+  .form-input::placeholder { color: var(--text3); font-size: 14px; }
+  .input-suffix { background: var(--bg3); border: 1px solid var(--border); color: var(--text3); font-size: 12px; padding: 12px 14px; display: flex; align-items: center; }
+  .options-grid { display: grid; gap: 4px; }
+  .options-grid.cols5 { grid-template-columns: repeat(5,1fr); }
+  .options-grid.cols4 { grid-template-columns: repeat(4,1fr); }
+  .opt-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--text3); font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; padding: 8px 4px; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .opt-btn:hover { color: var(--text2); border-color: var(--border2); }
+  .opt-btn.active-lev { background: rgba(0,170,255,0.1); border-color: var(--blue); color: var(--blue); }
+  .opt-btn.active-dur { background: rgba(255,184,0,0.1); border-color: var(--amber); color: var(--amber); }
+  .summary-box { background: var(--bg2); border: 1px solid var(--border); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .summary-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); }
+  .summary-row .val { color: var(--text); font-weight: 600; }
+  .summary-row.total { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 2px; }
+  .summary-row.total .val { color: var(--green); font-size: 14px; }
+  .submit-btn { width: 100%; padding: 16px; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; border: none; transition: all 0.2s; }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .submit-btn.long-btn { background: var(--green); color: var(--bg); box-shadow: 0 0 30px rgba(0,255,136,0.2); }
+  .submit-btn.short-btn { background: var(--red); color: white; box-shadow: 0 0 30px rgba(255,59,92,0.2); }
+  .mint-btn { width: 100%; padding: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text3); transition: all 0.2s; }
+  .mint-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .hint { font-size: 10px; color: var(--text3); line-height: 1.6; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg3); border: 1px solid var(--green); color: var(--green); font-size: 12px; font-weight: 600; padding: 14px 20px; z-index: 9999; transform: translateY(80px); opacity: 0; transition: all 0.3s; max-width: 360px; letter-spacing: 0.5px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.info { border-color: var(--blue); color: var(--blue); }
+
+  /* LOADING OVERLAY */
+  .tx-overlay { position: fixed; inset: 0; background: rgba(8,11,15,0.85); display: none; align-items: center; justify-content: center; z-index: 500; flex-direction: column; gap: 16px; }
+  .tx-overlay.show { display: flex; }
+  .tx-spinner { width: 40px; height: 40px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tx-msg { font-size: 13px; color: var(--text2); letter-spacing: 1px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    Flash<span>Perp</span>
+  </div>
+  <div class="header-right">
+    <div class="network-badge" id="networkBadge">⬡ FlashPerp Testnet</div>
+    <div class="wallet-info" id="walletInfo"></div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+</header>
+
+<div class="status-bar">
+  <div class="status-item">TVL <span class="status-val green" id="statTVL">—</span></div>
+  <div class="status-item">Available <span class="status-val" id="statAvail">—</span></div>
+  <div class="status-item">Utilisation <span class="status-val amber" id="statUtil">—</span></div>
+  <div class="status-item">Your USDC <span class="status-val" id="statBalance">—</span></div>
+  <div class="status-item">LP Shares <span class="status-val" id="statShares">—</span></div>
+</div>
+
+<div class="market-bar">
+  <div class="market-tab active" onclick="selectMarket('BTC/USD',this)">BTC/USD 5min</div>
+  <div class="market-tab" onclick="selectMarket('ETH/USD',this)">ETH/USD 5min</div>
+  <div class="market-tab" onclick="selectMarket('SOL/USD',this)">SOL/USD 5min</div>
+  <div class="market-tab" onclick="selectMarket('BTC/USD',this)">BTC/USD 1hr</div>
+</div>
+
+<div class="app">
+
+  <!-- LEFT -->
+  <div class="panel">
+    <div class="price-header">
+      <div class="current-price" id="livePrice">—</div>
+      <div class="price-change up" id="priceChange">—</div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+      <div class="chart-label">LIVE · MOCK ORACLE</div>
+    </div>
+
+    <div class="section-title">Pool Status</div>
+    <div class="pool-stats">
+      <div class="pool-stat">
+        <div class="pool-stat-label">Total Liquidity</div>
+        <div class="pool-stat-val green" id="poolTVL">—</div>
+      </div>
+      <div class="pool-stat">
+        <div class="pool-stat-label">Available</div>
+        <div class="pool-stat-val" id="poolAvail">—</div>
+      </div>
+      <div class="pool-stat">
+        <div class="pool-stat-label">Utilisation</div>
+        <div class="pool-stat-val amber" id="poolUtil">—</div>
+        <div class="util-track"><div class="util-fill" id="utilFill" style="width:0%"></div></div>
+      </div>
+      <div class="pool-stat">
+        <div class="pool-stat-label">Max Borrowable</div>
+        <div class="pool-stat-val" id="poolMax">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Your Positions</div>
+    <table class="positions-table">
+      <thead>
+        <tr>
+          <th>Market</th><th>Dir</th><th>Size</th><th>Entry</th><th>P&L</th><th>Expires</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="positionsBody">
+        <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">Connect wallet to see positions</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel order-panel">
+    <div class="section-title">Flash Position</div>
+
+    <div class="dir-toggle">
+      <button class="dir-btn long active" id="longBtn" onclick="setDir('long')">▲ LONG</button>
+      <button class="dir-btn short" id="shortBtn" onclick="setDir('short')">▼ SHORT</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Borrow Amount <span id="maxLabel">—</span></label>
+      <div class="input-wrap">
+        <input type="number" class="form-input" id="borrowInput" placeholder="0.00" min="10" step="10" oninput="updateSummary()">
+        <div class="input-suffix">USDC</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Leverage <span id="levLabel">5x</span></label>
+      <div class="options-grid cols5">
+        <button class="opt-btn" onclick="setLev(1,this)">1x</button>
+        <button class="opt-btn" onclick="setLev(2,this)">2x</button>
+        <button class="opt-btn active-lev" onclick="setLev(5,this)">5x</button>
+        <button class="opt-btn" onclick="setLev(7,this)">7x</button>
+        <button class="opt-btn" onclick="setLev(10,this)">10x</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Duration <span id="durLabel">5 min</span></label>
+      <div class="options-grid cols4">
+        <button class="opt-btn" onclick="setDur(60,'1 min',this)">1m</button>
+        <button class="opt-btn" onclick="setDur(120,'2 min',this)">2m</button>
+        <button class="opt-btn active-dur" onclick="setDur(300,'5 min',this)">5m</button>
+        <button class="opt-btn" onclick="setDur(900,'15 min',this)">15m</button>
+      </div>
+    </div>
+
+    <div class="summary-box">
+      <div class="summary-row"><span>Notional Size</span><span class="val" id="sumNotional">—</span></div>
+      <div class="summary-row"><span>Borrow Fee (0.3%)</span><span class="val" id="sumFee">—</span></div>
+      <div class="summary-row"><span>Entry Price</span><span class="val" id="sumEntry">—</span></div>
+      <div class="summary-row"><span>Liq. Price</span><span class="val" id="sumLiq" style="color:var(--red)">—</span></div>
+      <div class="summary-row"><span>Auto-settles in</span><span class="val" id="sumDur" style="color:var(--amber)">5 min</span></div>
+      <div class="summary-row total"><span>Max Profit (est 5% move)</span><span class="val" id="sumProfit">—</span></div>
+    </div>
+
+    <button class="submit-btn long-btn" id="submitBtn" onclick="openPosition()" disabled>
+      Connect Wallet First
+    </button>
+
+    <button class="mint-btn" id="mintBtn" onclick="mintUSDC()" style="display:none">
+      🪙 Mint 10,000 Test USDC
+    </button>
+
+    <div class="hint">
+      Flash positions are auto-settled at expiry. No collateral required.
+      Liquidated if health factor &lt; 1.0. Powered by FlashPerp Protocol.
+    </div>
+  </div>
+
+</div>
+
+<!-- TX OVERLAY -->
+<div class="tx-overlay" id="txOverlay">
+  <div class="tx-spinner"></div>
+  <div class="tx-msg" id="txMsg">Waiting for confirmation...</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Contract Config ───────────────────────────────────────────────────────────
+const CHAIN_ID = 31337;
+const RPC_URL  = "http://127.0.0.1:8545";
+
+const CONTRACTS = {
+  USDC:            "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  LiquidityPool:   "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  OracleAdapter:   "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+  MarketFactory:   "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+  PositionManager: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+};
+
+const ABI = {
+  USDC: [
+    "function balanceOf(address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)",
+    "function allowance(address,address) view returns (uint256)",
+    "function mint(address,uint256)",
+    "function decimals() view returns (uint8)",
+  ],
+  LiquidityPool: [
+    "function totalDeposits() view returns (uint256)",
+    "function totalBorrowed() view returns (uint256)",
+    "function availableLiquidity() view returns (uint256)",
+    "function utilisationRate() view returns (uint256)",
+    "function maxBorrowable() view returns (uint256)",
+    "function lpShares(address) view returns (uint256)",
+    "function deposit(uint256)",
+    "function withdraw(uint256)",
+  ],
+  OracleAdapter: [
+    "function getPrice(bytes32) view returns (uint256,uint256)",
+  ],
+  MarketFactory: [
+    "function allMarkets() view returns (bytes32[])",
+    "function getMarket(bytes32) view returns (tuple(bytes32 id,string name,bytes32 oracleMarketId,uint256 minDuration,uint256 maxDuration,uint256 maxLeverage,uint256 creationFee,address creator,bool active,uint256 createdAt))",
+  ],
+  PositionManager: [
+    "function openPosition(bytes32,uint256,uint256,bool,uint256) returns (address)",
+    "function closeEarly(address)",
+    "function settlePosition(address)",
+    "function getPosition(address) view returns (tuple(address trader,bytes32 marketId,uint256 borrowed,uint256 size,bool isLong,uint256 entryPrice,uint256 openedAt,uint256 expiresAt,uint8 status,uint256 payout))",
+    "function getTraderPositions(address) view returns (address[])",
+    "function timeRemaining(address) view returns (uint256)",
+    "event PositionOpened(address indexed,address indexed,bytes32 indexed,uint256,uint256,bool,uint256,uint256)",
+    "event PositionSettled(address indexed,address indexed,uint256,int256)",
+  ],
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let provider, signer, address;
+let contracts = {};
+let state = {
+  market: 'BTC/USD',
+  dir: 'long',
+  leverage: 5,
+  duration: 300,
+  marketIds: {},
+  price: 0,
+  priceHistory: [],
+  positions: [],
+};
+
+const HISTORY_LEN = 80;
+
+// ── Connect Wallet ────────────────────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) { showToast('MetaMask not found. Please install it.', 'error'); return; }
+
+  try {
+    showTx('Connecting wallet...');
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer   = await provider.getSigner();
+    address  = await signer.getAddress();
+
+    // Check network
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== CHAIN_ID) {
+      // Try to switch
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x' + CHAIN_ID.toString(16) }],
+        });
+      } catch(e) {
+        // Add network if not found
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x' + CHAIN_ID.toString(16),
+            chainName: 'FlashPerp Testnet',
+            rpcUrls: [RPC_URL],
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+          }]
+        });
+      }
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer   = await provider.getSigner();
+      address  = await signer.getAddress();
+    }
+
+    // Init contracts
+    contracts.usdc    = new ethers.Contract(CONTRACTS.USDC,            ABI.USDC,            signer);
+    contracts.pool    = new ethers.Contract(CONTRACTS.LiquidityPool,   ABI.LiquidityPool,   signer);
+    contracts.oracle  = new ethers.Contract(CONTRACTS.OracleAdapter,   ABI.OracleAdapter,   provider);
+    contracts.factory = new ethers.Contract(CONTRACTS.MarketFactory,   ABI.MarketFactory,   provider);
+    contracts.pm      = new ethers.Contract(CONTRACTS.PositionManager, ABI.PositionManager, signer);
+
+    // Update UI
+    const short = address.slice(0,6) + '...' + address.slice(-4);
+    document.getElementById('connectBtn').textContent = short;
+    document.getElementById('connectBtn').classList.add('connected');
+    document.getElementById('networkBadge').style.display = 'block';
+    document.getElementById('walletInfo').style.display = 'block';
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = '⚡ OPEN LONG';
+    document.getElementById('mintBtn').style.display = 'block';
+
+    hideTx();
+    showToast('Wallet connected: ' + short);
+
+    // Load markets and start data refresh
+    await loadMarkets();
+    await refreshAll();
+    await loadPositions();
+    setInterval(refreshAll, 5000);
+    setInterval(loadPositions, 3000);
+    setInterval(tickSimPrice, 800);
+    setInterval(updateCountdowns, 1000);
+
+  } catch(e) {
+    hideTx();
+    showToast(e.message?.slice(0,80) || 'Connection failed', 'error');
+  }
+}
+
+// ── Load Markets ──────────────────────────────────────────────────────────────
+async function loadMarkets() {
+  try {
+    const ids = await contracts.factory.allMarkets();
+    for (const id of ids) {
+      const m = await contracts.factory.getMarket(id);
+      state.marketIds[m.name] = id;
+    }
+    console.log('Markets loaded:', state.marketIds);
+  } catch(e) {
+    console.error('loadMarkets:', e);
+  }
+}
+
+// ── Refresh On-chain Data ─────────────────────────────────────────────────────
+async function refreshAll() {
+  if (!contracts.pool) return;
+  try {
+    const [totalDep, totalBorr, avail, util, maxBorr, balance, shares] = await Promise.all([
+      contracts.pool.totalDeposits(),
+      contracts.pool.totalBorrowed(),
+      contracts.pool.availableLiquidity(),
+      contracts.pool.utilisationRate(),
+      contracts.pool.maxBorrowable(),
+      contracts.usdc.balanceOf(address),
+      contracts.pool.lpShares(address),
+    ]);
+
+    const fmt = (n, dec=6) => '$' + (Number(ethers.formatUnits(n, dec))).toLocaleString('en-US', {maximumFractionDigits:0});
+    const fmtPct = n => (Number(n) / 1e16).toFixed(1) + '%';
+
+    document.getElementById('poolTVL').textContent   = fmt(totalDep);
+    document.getElementById('poolAvail').textContent = fmt(avail);
+    document.getElementById('poolUtil').textContent  = fmtPct(util);
+    document.getElementById('poolMax').textContent   = fmt(maxBorr);
+    document.getElementById('utilFill').style.width  = Math.min(Number(fmtPct(util)), 100) + '%';
+
+    document.getElementById('statTVL').textContent     = fmt(totalDep);
+    document.getElementById('statAvail').textContent   = fmt(avail);
+    document.getElementById('statUtil').textContent    = fmtPct(util);
+    document.getElementById('statBalance').textContent = fmt(balance);
+    document.getElementById('statShares').textContent  = fmt(shares);
+    document.getElementById('maxLabel').textContent    = 'MAX ' + fmt(maxBorr);
+
+    // Fetch oracle price
+    await refreshPrice();
+
+    // Load positions
+    await loadPositions();
+
+  } catch(e) {
+    console.error('refreshAll:', e);
+  }
+}
+
+// ── Price Feed ────────────────────────────────────────────────────────────────
+async function refreshPrice() {
+  try {
+    const marketKey = state.market === 'BTC/USD' 
+      ? ethers.keccak256(ethers.toUtf8Bytes('BTC/USD'))
+      : state.market === 'ETH/USD'
+      ? ethers.keccak256(ethers.toUtf8Bytes('ETH/USD'))
+      : ethers.keccak256(ethers.toUtf8Bytes('SOL/USD'));
+
+    const [price] = await contracts.oracle.getPrice(marketKey);
+    // Price is 18 decimals
+    const priceNum = Number(ethers.formatUnits(price, 18));
+    state.price = priceNum;
+
+    if (state.priceHistory.length === 0) {
+      for (let i = 0; i < HISTORY_LEN; i++) state.priceHistory.push(priceNum);
+    }
+
+    updatePriceDisplay(priceNum);
+    updateSummary();
+  } catch(e) {
+    console.error('refreshPrice:', e);
+  }
+}
+
+function tickSimPrice() {
+  if (!state.price) return;
+  const drift = (Math.random() - 0.495) * state.price * 0.0012;
+  state.price += drift;
+  state.priceHistory.push(state.price);
+  if (state.priceHistory.length > HISTORY_LEN) state.priceHistory.shift();
+  updatePriceDisplay(state.price);
+  drawChart();
+  updateSummary();
+}
+
+function updatePriceDisplay(p) {
+  const first = state.priceHistory[0] || p;
+  const pct = ((p - first) / first * 100).toFixed(2);
+  const up = parseFloat(pct) >= 0;
+  document.getElementById('livePrice').textContent = '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const el = document.getElementById('priceChange');
+  el.textContent = (up?'+':'') + pct + '%';
+  el.className = 'price-change ' + (up ? 'up' : 'dn');
+  document.getElementById('sumEntry').textContent = '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function drawChart() {
+  const canvas = document.getElementById('priceChart');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  const W = canvas.width, H = canvas.height;
+  if (!state.priceHistory.length) return;
+  const min = Math.min(...state.priceHistory) * 0.999;
+  const max = Math.max(...state.priceHistory) * 1.001;
+  const range = max - min;
+  const toX = i => (i / (HISTORY_LEN-1)) * W;
+  const toY = v => H - ((v - min) / range) * (H * 0.85) - H * 0.075;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle = 'rgba(30,42,53,0.6)'; ctx.lineWidth = 1;
+  for (let i=0;i<=4;i++) { ctx.beginPath(); ctx.moveTo(0,(i/4)*H); ctx.lineTo(W,(i/4)*H); ctx.stroke(); }
+  const last = state.priceHistory[state.priceHistory.length-1];
+  const isUp = last >= state.priceHistory[0];
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, isUp ? 'rgba(0,255,136,0.15)' : 'rgba(255,59,92,0.15)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.moveTo(toX(0),H);
+  state.priceHistory.forEach((v,i) => ctx.lineTo(toX(i),toY(v)));
+  ctx.lineTo(toX(HISTORY_LEN-1),H); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath();
+  state.priceHistory.forEach((v,i) => i===0 ? ctx.moveTo(toX(i),toY(v)) : ctx.lineTo(toX(i),toY(v)));
+  ctx.strokeStyle = isUp ? '#00ff88' : '#ff3b5c'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+// ── Load Positions ────────────────────────────────────────────────────────────
+async function loadPositions() {
+  if (!address) return;
+  try {
+    const posIds = await contracts.pm.getTraderPositions(address);
+    const positions = [];
+    for (const id of posIds) {
+      const pos = await contracts.pm.getPosition(id);
+      if (pos.status === 0n) { // Open
+        const timeLeft = await contracts.pm.timeRemaining(id);
+        positions.push({
+          id,
+          trader:     pos[0],
+          marketId:   pos[1],
+          borrowed:   pos[2],
+          size:       pos[3],
+          isLong:     pos[4],
+          entryPrice: pos[5],
+          openedAt:   pos[6],
+          expiresAt:  pos[7],
+          status:     pos[8],
+          payout:     pos[9],
+          timeLeft:   Number(timeLeft)
+        });
+      }
+    }
+    state.positions = positions;
+    renderPositions();
+  } catch(e) {
+    console.error('loadPositions:', e);
+  }
+}
+
+function renderPositions() {
+  const tbody = document.getElementById('positionsBody');
+  if (!state.positions.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">No open positions</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = state.positions.map(p => {
+    const borrowed = Number(ethers.formatUnits(p.borrowed, 6));
+    const size     = Number(ethers.formatUnits(p.size, 6));
+    const entry    = Number(ethers.formatUnits(p.entryPrice, 18));
+    const curPrice = state.price || entry;
+    const priceDelta = curPrice - entry;
+    const pnl = (p.isLong ? priceDelta : -priceDelta) * (size / entry);
+    const t = p.timeLeft;
+    const mm = String(Math.floor(t/60)).padStart(2,'0');
+    const ss = String(t%60).padStart(2,'0');
+    const cdClass = t===0?'done':t<30?'warning':'normal';
+    const cdText  = t===0?'EXPIRED':`${mm}:${ss}`;
+    return `
+      <tr>
+        <td style="color:var(--text);font-weight:600">${state.market}</td>
+        <td class="${p.isLong?'pos-long':'pos-short'}">${p.isLong?'LONG':'SHORT'}</td>
+        <td>$${size.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
+        <td>$${entry.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
+        <td class="${pnl>=0?'pos-profit':'pos-loss'}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</td>
+        <td><span class="countdown ${cdClass}" data-id="${p.id}">${cdText}</span></td>
+        <td><button class="close-btn" onclick="closePosition('${p.id}')">${t===0?'Settle':'Close'}</button></td>
+      </tr>`;
+  }).join('');
+}
+
+function updateCountdowns() {
+  state.positions = state.positions.map(p => ({...p, timeLeft: Math.max(0, p.timeLeft - 1)}));
+  renderPositions();
+}
+
+// ── Open Position ─────────────────────────────────────────────────────────────
+async function openPosition() {
+  if (!signer) { showToast('Connect wallet first', 'error'); return; }
+
+  const borrowRaw = parseFloat(document.getElementById('borrowInput').value);
+  if (!borrowRaw || borrowRaw < 10) { showToast('Minimum borrow is $10 USDC', 'error'); return; }
+
+  const marketName = state.market + (state.duration <= 300 ? ' 5min' : ' 1hr');
+  const marketId   = state.marketIds[marketName] || state.marketIds[state.market + ' 5min'];
+  if (!marketId) { showToast('Market not found. Check contract deployment.', 'error'); return; }
+
+  const borrowed  = ethers.parseUnits(borrowRaw.toString(), 6);
+  const leverage  = ethers.parseUnits(state.leverage.toString(), 18);
+  const isLong    = state.dir === 'long';
+  const duration  = state.duration;
+
+  try {
+    // Check allowance
+    showTx('Checking USDC allowance...');
+    const allowance = await contracts.usdc.allowance(address, CONTRACTS.PositionManager);
+    if (allowance < borrowed) {
+      showTx('Approving USDC...');
+      const approveTx = await contracts.usdc.approve(CONTRACTS.PositionManager, ethers.MaxUint256);
+      await approveTx.wait();
+    }
+
+    showTx('Opening position...');
+    const tx = await contracts.pm.openPosition(marketId, borrowed, leverage, isLong, duration);
+    showTx('Waiting for confirmation...');
+    const receipt = await tx.wait();
+
+    hideTx();
+    document.getElementById('borrowInput').value = '';
+    showToast(`⚡ ${isLong?'LONG':'SHORT'} opened · $${borrowRaw.toLocaleString()} · ${duration/60}min`);
+
+    await refreshAll();
+
+  } catch(e) {
+    hideTx();
+    const msg = e?.reason || e?.message?.slice(0,100) || 'Transaction failed';
+    showToast(msg, 'error');
+  }
+}
+
+// ── Close Position ────────────────────────────────────────────────────────────
+async function closePosition(posId) {
+  try {
+    showTx('Closing position...');
+    const pos = await contracts.pm.getPosition(posId);
+    const timeLeft = await contracts.pm.timeRemaining(posId);
+
+    let tx;
+    if (Number(timeLeft) === 0) {
+      tx = await contracts.pm.settlePosition(posId);
+    } else {
+      tx = await contracts.pm.closeEarly(posId);
+    }
+    showTx('Confirming...');
+    await tx.wait();
+    hideTx();
+    showToast('Position closed successfully');
+    await refreshAll();
+  } catch(e) {
+    hideTx();
+    showToast(e?.reason || 'Close failed', 'error');
+  }
+}
+
+// ── Mint Test USDC ────────────────────────────────────────────────────────────
+async function mintUSDC() {
+  if (!signer) { showToast('Connect wallet first', 'error'); return; }
+  try {
+    showTx('Minting 10,000 test USDC...');
+    const tx = await contracts.usdc.mint(address, ethers.parseUnits('10000', 6));
+    await tx.wait();
+    hideTx();
+    showToast('✅ 10,000 test USDC minted!');
+    await refreshAll();
+  } catch(e) {
+    hideTx();
+    showToast(e?.reason || 'Mint failed', 'error');
+  }
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function setDir(dir) {
+  state.dir = dir;
+  document.getElementById('longBtn').classList.toggle('active', dir==='long');
+  document.getElementById('shortBtn').classList.toggle('active', dir==='short');
+  const btn = document.getElementById('submitBtn');
+  btn.className = 'submit-btn ' + (dir==='long'?'long-btn':'short-btn');
+  if (!btn.disabled) btn.textContent = `⚡ OPEN ${dir.toUpperCase()}`;
+  updateSummary();
+}
+
+function setLev(val, el) {
+  state.leverage = val;
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active-lev'));
+  el.classList.add('active-lev');
+  document.getElementById('levLabel').textContent = val + 'x';
+  updateSummary();
+}
+
+function setDur(val, label, el) {
+  state.duration = val;
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active-dur'));
+  el.classList.add('active-dur');
+  document.getElementById('durLabel').textContent = label;
+  document.getElementById('sumDur').textContent = label;
+  updateSummary();
+}
+
+function selectMarket(mkt, el) {
+  state.market = mkt;
+  state.priceHistory = [];
+  document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  if (contracts.oracle) refreshPrice();
+}
+
+function updateSummary() {
+  const borrow = parseFloat(document.getElementById('borrowInput').value) || 0;
+  const p = state.price;
+  if (!borrow || !p) {
+    ['sumNotional','sumFee','sumLiq','sumProfit'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const notional = borrow * state.leverage;
+  const fee = borrow * 0.003;
+  const liqMult = state.dir==='long' ? 1 - 1/state.leverage : 1 + 1/state.leverage;
+  const liqPrice = p * liqMult;
+  const maxProfit = notional * 0.05;
+  document.getElementById('sumNotional').textContent = '$' + notional.toLocaleString('en-US',{maximumFractionDigits:0});
+  document.getElementById('sumFee').textContent      = '$' + fee.toFixed(2);
+  document.getElementById('sumLiq').textContent      = '$' + liqPrice.toLocaleString('en-US',{maximumFractionDigits:2});
+  document.getElementById('sumProfit').textContent   = '+$' + maxProfit.toFixed(2);
+}
+
+// ── UI Helpers ────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = 'toast', 4000);
+}
+
+function showTx(msg) {
+  document.getElementById('txMsg').textContent = msg;
+  document.getElementById('txOverlay').classList.add('show');
+}
+function hideTx() { document.getElementById('txOverlay').classList.remove('show'); }
+
+window.addEventListener('resize', drawChart);
+</script>
+</body>
+</html>

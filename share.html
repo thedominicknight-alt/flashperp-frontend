@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FlashPerp Share Card</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:#05070a; --panel:#0d1219; --border:rgba(255,255,255,0.06);
+    --green:#00e87a; --red:#ff4060; --amber:#ffaa00;
+    --text:#e8edf2; --text2:#6b7a8d; --text3:#3a4655;
+    --mono:'Space Mono',monospace;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;font-family:var(--mono)}
+
+  .controls{background:#1a1a1a;border:1px solid #333;padding:20px;margin-bottom:24px;width:100%;max-width:600px;display:flex;flex-direction:column;gap:12px}
+  .ctrl-title{color:#888;font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+  .ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ctrl-row.three{grid-template-columns:1fr 1fr 1fr}
+  input,select{background:#0d1219;border:1px solid #333;color:#e8edf2;font-family:var(--mono);font-size:13px;padding:8px 10px;width:100%;outline:none}
+  input:focus,select:focus{border-color:#00e87a}
+  label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#6b7a8d;display:block;margin-bottom:4px}
+  .gen-btn{background:#00e87a;color:#05070a;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border:none;padding:12px;cursor:pointer;width:100%}
+  .gen-btn:hover{background:#00ff88}
+  .dl-btn{background:transparent;color:#00e87a;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(0,232,122,0.4);padding:10px;cursor:pointer;width:100%;margin-top:8px}
+  .dl-btn:hover{background:rgba(0,232,122,0.1)}
+
+  /* THE CARD */
+  .card-wrap{width:600px}
+  canvas{display:none}
+
+  #shareCard{
+    width:600px;
+    background:var(--void);
+    border:1px solid var(--border);
+    padding:0;
+    overflow:hidden;
+    font-family:var(--mono);
+  }
+
+  .card-top{
+    background:var(--panel);
+    padding:28px 28px 20px;
+    border-bottom:1px solid var(--border);
+    position:relative;
+    overflow:hidden;
+  }
+
+  .card-grid-bg{
+    position:absolute;inset:0;
+    background-image:linear-gradient(rgba(0,232,122,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,232,122,0.03) 1px,transparent 1px);
+    background-size:30px 30px;
+    pointer-events:none;
+  }
+
+  .card-logo{display:flex;align-items:center;gap:8px;margin-bottom:20px}
+  .card-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .card-logo-text{font-size:12px;font-weight:700;letter-spacing:3px;color:var(--green)}
+
+  .card-result{font-size:52px;font-weight:700;letter-spacing:-2px;line-height:1}
+  .card-result.profit{color:var(--green)}
+  .card-result.loss{color:var(--red)}
+
+  .card-subtitle{font-size:13px;color:var(--text2);margin-top:8px;letter-spacing:1px}
+
+  .card-body{padding:20px 28px}
+
+  .card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:16px}
+  .card-stat{background:var(--panel);padding:14px 12px}
+  .card-stat-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+  .card-stat-val{font-size:16px;font-weight:700}
+  .card-stat-val.g{color:var(--green)}
+  .card-stat-val.r{color:var(--red)}
+  .card-stat-val.a{color:var(--amber)}
+
+  .card-footer{display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--border)}
+  .card-footer-left{font-size:10px;color:var(--text3);letter-spacing:1px}
+  .card-footer-right{font-size:10px;color:var(--text3);letter-spacing:1px;text-align:right}
+
+  .card-dir-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;margin-top:10px}
+  .card-dir-badge.long{color:var(--green);border:1px solid rgba(0,232,122,0.3);background:rgba(0,232,122,0.08)}
+  .card-dir-badge.short{color:var(--red);border:1px solid rgba(255,64,96,0.3);background:rgba(255,64,96,0.08)}
+  .card-dir-badge.liq{color:var(--red);border:1px solid rgba(255,64,96,0.5);background:rgba(255,64,96,0.12)}
+
+  .corner{position:absolute;width:16px;height:16px}
+  .corner.tl{top:12px;left:12px;border-top:1px solid #1e2a35;border-left:1px solid #1e2a35}
+  .corner.tr{top:12px;right:12px;border-top:1px solid #1e2a35;border-right:1px solid #1e2a35}
+  .corner.bl{bottom:12px;left:12px;border-bottom:1px solid #1e2a35;border-left:1px solid #1e2a35}
+  .corner.br{bottom:12px;right:12px;border-bottom:1px solid #1e2a35;border-right:1px solid #1e2a35}
+</style>
+</head>
+<body>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="ctrl-title">Generate Trade Card</div>
+  <div class="ctrl-row">
+    <div>
+      <label>Market</label>
+      <select id="ctrlMarket">
+        <option>BTC/USD</option>
+        <option>ETH/USD</option>
+        <option>SOL/USD</option>
+        <option>EUR/USD</option>
+        <option>XAU/USD</option>
+      </select>
+    </div>
+    <div>
+      <label>Direction</label>
+      <select id="ctrlDir">
+        <option value="long">LONG</option>
+        <option value="short">SHORT</option>
+        <option value="liq">LIQUIDATED</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctrl-row three">
+    <div>
+      <label>P&L ($)</label>
+      <input type="number" id="ctrlPnl" value="27531" placeholder="e.g. 5000">
+    </div>
+    <div>
+      <label>Size ($)</label>
+      <input type="number" id="ctrlSize" value="20000000" placeholder="e.g. 100000">
+    </div>
+    <div>
+      <label>Leverage</label>
+      <input type="number" id="ctrlLev" value="10" placeholder="e.g. 5">
+    </div>
+  </div>
+  <div class="ctrl-row">
+    <div>
+      <label>Entry Price</label>
+      <input type="number" id="ctrlEntry" value="69448" placeholder="e.g. 69000">
+    </div>
+    <div>
+      <label>Exit Price</label>
+      <input type="number" id="ctrlExit" value="70590" placeholder="e.g. 70000">
+    </div>
+  </div>
+  <div>
+    <label>Duration</label>
+    <select id="ctrlDur">
+      <option>1 min</option>
+      <option>2 min</option>
+      <option selected>5 min</option>
+      <option>15 min</option>
+      <option>1 hour</option>
+    </select>
+  </div>
+  <button class="gen-btn" onclick="generateCard()">Generate Card</button>
+  <button class="dl-btn" onclick="downloadCard()">Download PNG</button>
+</div>
+
+<!-- The Share Card -->
+<div class="card-wrap">
+  <div id="shareCard">
+    <div class="card-top">
+      <div class="card-grid-bg"></div>
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+
+      <div class="card-logo">
+        <div class="card-logo-dot"></div>
+        <div class="card-logo-text">FLASHPERP.FI</div>
+      </div>
+
+      <div class="card-result profit" id="cardPnl">+$27,531</div>
+      <div class="card-subtitle" id="cardSubtitle">BTC/USD · 5 min · 10x Leverage</div>
+      <div class="card-dir-badge long" id="cardBadge">▲ LONG</div>
+    </div>
+
+    <div class="card-body">
+      <div class="card-stats">
+        <div class="card-stat">
+          <div class="card-stat-label">Position Size</div>
+          <div class="card-stat-val" id="cardSize">$20,000,000</div>
+        </div>
+        <div class="card-stat">
+          <div class="card-stat-label">Entry Price</div>
+          <div class="card-stat-val a" id="cardEntry">$69,448</div>
+        </div>
+        <div class="card-stat">
+          <div class="card-stat-label">Exit Price</div>
+          <div class="card-stat-val g" id="cardExit">$70,590</div>
+        </div>
+        <div class="card-stat">
+          <div class="card-stat-label">ROI</div>
+          <div class="card-stat-val g" id="cardRoi">+1.64%</div>
+        </div>
+        <div class="card-stat">
+          <div class="card-stat-label">Duration</div>
+          <div class="card-stat-val" id="cardDur">5 min</div>
+        </div>
+        <div class="card-stat">
+          <div class="card-stat-label">Collateral</div>
+          <div class="card-stat-val g">$0</div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-footer-left">
+          flashperp.fi · No collateral required<br>
+          Testnet · Arbitrum
+        </div>
+        <div class="card-footer-right">
+          @FlashPerpFi<br>
+          <span style="color:var(--green)">Trade now →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+function generateCard() {
+  const market = document.getElementById('ctrlMarket').value;
+  const dir    = document.getElementById('ctrlDir').value;
+  const pnl    = parseFloat(document.getElementById('ctrlPnl').value) || 0;
+  const size   = parseFloat(document.getElementById('ctrlSize').value) || 0;
+  const lev    = parseFloat(document.getElementById('ctrlLev').value) || 1;
+  const entry  = parseFloat(document.getElementById('ctrlEntry').value) || 0;
+  const exit   = parseFloat(document.getElementById('ctrlExit').value) || 0;
+  const dur    = document.getElementById('ctrlDur').value;
+
+  const isProfit = pnl >= 0;
+  const isLiq    = dir === 'liq';
+  const roi      = size > 0 ? ((pnl / size) * 100 * lev).toFixed(2) : '0.00';
+
+  const fmt = n => '$' + Math.abs(n).toLocaleString('en-US', {maximumFractionDigits: 0});
+  const fmtPrice = n => '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  // P&L
+  const pnlEl = document.getElementById('cardPnl');
+  pnlEl.textContent = (isLiq ? 'LIQUIDATED' : (isProfit ? '+' : '-') + fmt(pnl));
+  pnlEl.className = 'card-result ' + (isLiq ? 'loss' : isProfit ? 'profit' : 'loss');
+
+  // Subtitle
+  document.getElementById('cardSubtitle').textContent = `${market} · ${dur} · ${lev}x Leverage`;
+
+  // Badge
+  const badge = document.getElementById('cardBadge');
+  if (isLiq) {
+    badge.textContent = '✕ LIQUIDATED';
+    badge.className = 'card-dir-badge liq';
+  } else if (dir === 'long') {
+    badge.textContent = '▲ LONG';
+    badge.className = 'card-dir-badge long';
+  } else {
+    badge.textContent = '▼ SHORT';
+    badge.className = 'card-dir-badge short';
+  }
+
+  // Stats
+  document.getElementById('cardSize').textContent  = fmt(size);
+  document.getElementById('cardEntry').textContent = fmtPrice(entry);
+  document.getElementById('cardExit').textContent  = fmtPrice(exit);
+
+  const roiEl = document.getElementById('cardRoi');
+  roiEl.textContent = (parseFloat(roi) >= 0 ? '+' : '') + roi + '%';
+  roiEl.className = 'card-stat-val ' + (parseFloat(roi) >= 0 ? 'g' : 'r');
+
+  document.getElementById('cardDur').textContent = dur;
+}
+
+async function downloadCard() {
+  const card = document.getElementById('shareCard');
+  try {
+    const canvas = await html2canvas(card, {
+      backgroundColor: '#05070a',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = 'flashperp-trade.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('Download failed: ' + e.message);
+  }
+}
+
+// Read URL params if present
+const params = new URLSearchParams(window.location.search);
+if (params.get('market')) {
+  const marketEl = document.getElementById('ctrlMarket');
+  const options = Array.from(marketEl.options).map(o => o.value);
+  const mkt = params.get('market');
+  if (options.includes(mkt)) marketEl.value = mkt;
+  
+  const dir = params.get('dir') || 'long';
+  document.getElementById('ctrlDir').value = dir;
+  document.getElementById('ctrlPnl').value = params.get('pnl') || '0';
+  document.getElementById('ctrlSize').value = params.get('size') || '0';
+  document.getElementById('ctrlEntry').value = params.get('entry') || '0';
+  document.getElementById('ctrlExit').value = params.get('exit') || '0';
+}
+generateCard();
+</script>
+</body>
+</html>

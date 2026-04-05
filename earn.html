@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashPerp — Earn</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:#05070a; --surface:#090d12; --panel:#0d1219; --raised:#111820;
+    --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.12);
+    --green:#00e87a; --red:#ff4060; --amber:#ffaa00; --blue:#00aaff;
+    --text:#e8edf2; --text2:#6b7a8d; --text3:#3a4655;
+    --mono:'Space Mono',monospace; --sans:'Space Grotesk',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);color:var(--text);font-family:var(--sans);min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,232,122,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,232,122,0.015) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+  *{position:relative;z-index:1}
+
+  nav{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(5,7,10,0.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--green);text-decoration:none}
+  .logo-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .nav-links{display:flex;gap:24px}
+  .nav-links a{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text2);text-decoration:none;transition:color 0.15s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-links a.active{color:var(--green)}
+  .connect-btn{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:var(--green);color:var(--void);border:none;padding:8px 18px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px));transition:background 0.15s}
+  .connect-btn:hover{background:#00ff88}
+  .connect-btn.connected{background:transparent;color:var(--green);border:1px solid rgba(0,232,122,0.4);clip-path:none}
+
+  .page{max-width:1000px;margin:0 auto;padding:40px 24px}
+
+  .page-header{margin-bottom:40px}
+  .page-tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--green);margin-bottom:12px}
+  .page-title{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-1px;line-height:1.1;margin-bottom:12px}
+  .page-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:500px}
+
+  /* POOL STATS BAR */
+  .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:32px}
+  .stat-cell{background:var(--panel);padding:16px 20px}
+  .stat-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+  .stat-val{font-family:var(--mono);font-size:22px;font-weight:700}
+  .stat-val.g{color:var(--green)}
+  .stat-val.a{color:var(--amber)}
+
+  /* MAIN GRID */
+  .main-grid{display:grid;grid-template-columns:1fr 380px;gap:1px;background:var(--border)}
+
+  /* LEFT — pool info */
+  .pool-info{background:var(--panel);padding:28px}
+
+  .section-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .info-row:last-child{border-bottom:none}
+  .info-label{color:var(--text2);font-family:var(--mono);font-size:10px;letter-spacing:0.5px}
+  .info-val{font-family:var(--mono);font-size:13px;font-weight:700}
+  .info-val.g{color:var(--green)}
+  .info-val.a{color:var(--amber)}
+
+  .util-track{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
+  .util-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber));transition:width 1s}
+
+  /* How it works */
+  .how-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:24px}
+  .how-card{background:var(--raised);padding:16px}
+  .how-num{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--green);margin-bottom:8px}
+  .how-title{font-family:var(--mono);font-size:12px;font-weight:700;margin-bottom:6px}
+  .how-desc{font-size:12px;color:var(--text2);line-height:1.6}
+
+  /* RIGHT — deposit form */
+  .deposit-form{background:var(--surface);padding:28px;display:flex;flex-direction:column;gap:20px}
+
+  .tab-switch{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--panel);padding:3px;border:1px solid var(--border)}
+  .tab-btn{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:10px;border:none;background:transparent;color:var(--text3);cursor:pointer;transition:all 0.15s}
+  .tab-btn.active{background:var(--raised);color:var(--green);border:1px solid rgba(0,232,122,0.2)}
+
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);display:flex;justify-content:space-between}
+  .field-label span{color:var(--text2)}
+  .field-row{display:flex;gap:1px}
+  .field-input{flex:1;background:var(--panel);border:1px solid var(--border2);border-right:none;color:var(--text);font-family:var(--mono);font-size:18px;font-weight:700;padding:12px 14px;outline:none;transition:border-color 0.15s;width:100%}
+  .field-input:focus{border-color:var(--green)}
+  .field-input::placeholder{color:var(--text3);font-size:14px}
+  .field-suf{background:var(--raised);border:1px solid var(--border2);color:var(--text3);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;padding:12px 14px;display:flex;align-items:center;flex-shrink:0}
+
+  .pct-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:3px}
+  .pct-btn{background:var(--panel);border:1px solid var(--border);color:var(--text3);font-family:var(--mono);font-size:10px;font-weight:700;padding:6px;cursor:pointer;text-align:center;transition:all 0.12s}
+  .pct-btn:hover{border-color:var(--green);color:var(--green)}
+
+  .summary-box{background:var(--panel);border:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:8px}
+  .sum-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text2)}
+  .sum-row .val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text)}
+  .sum-row.total{border-top:1px solid var(--border);padding-top:8px;margin-top:2px}
+  .sum-row.total .val{color:var(--green);font-size:14px}
+
+  .action-btn{width:100%;padding:15px;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:pointer;border:none;transition:all 0.15s;background:var(--green);color:var(--void);clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+  .action-btn:hover{background:#00ff88}
+  .action-btn:disabled{opacity:0.3;cursor:not-allowed;clip-path:none}
+  .action-btn.withdraw{background:transparent;color:var(--amber);border:1px solid rgba(255,170,0,0.4);clip-path:none}
+  .action-btn.withdraw:hover{background:rgba(255,170,0,0.1)}
+
+  .mint-btn{width:100%;padding:9px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:transparent;border:1px solid var(--border2);color:var(--text3);cursor:pointer;transition:all 0.15s;display:none}
+  .mint-btn:hover{border-color:var(--blue);color:var(--blue)}
+
+  .footnote{font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.7;letter-spacing:0.3px}
+
+  /* YOUR POSITION */
+  .position-card{background:var(--panel);border:1px solid rgba(0,232,122,0.2);padding:16px;margin-top:16px;display:none}
+  .pos-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:12px}
+  .pos-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .pos-stat:last-child{border-bottom:none}
+  .pos-label{color:var(--text2);font-family:var(--mono);font-size:10px}
+  .pos-val{font-family:var(--mono);font-weight:700}
+  .pos-val.g{color:var(--green)}
+
+  /* TX overlay */
+  .overlay{position:fixed;inset:0;background:rgba(5,7,10,0.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:900}
+  .overlay.on{display:flex}
+  .spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .overlay-msg{font-family:var(--mono);font-size:12px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--raised);border-left:3px solid var(--green);color:var(--text);font-family:var(--mono);font-size:11px;padding:12px 18px;z-index:999;max-width:360px;letter-spacing:0.5px;transform:translateY(60px);opacity:0;transition:all 0.25s}
+  .toast.on{transform:translateY(0);opacity:1}
+  .toast.err{border-left-color:var(--red)}
+
+  @media(max-width:768px){.main-grid{grid-template-columns:1fr}.stats-bar{grid-template-columns:1fr 1fr}.how-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo"><div class="logo-dot"></div>FlashPerp</a>
+  <div class="nav-links">
+    <a href="flashperp-warroom.html">Trade</a>
+    <a href="earn.html" class="active">Earn</a>
+    <a href="stats.html">Stats</a>
+    <a href="index.html">Home</a>
+  </div>
+  <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect</button>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-tag">// Liquidity Providers</div>
+    <h1 class="page-title">Earn yield.<br><span style="color:var(--green)">Back the pool.</span></h1>
+    <p class="page-sub">Deposit USDC into the FlashPerp liquidity pool. Every flash position pays a 0.3% borrow fee — LPs earn it all.</p>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-cell">
+      <div class="stat-label">Pool TVL</div>
+      <div class="stat-val g" id="tvl">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Est. APY</div>
+      <div class="stat-val g">18.4%</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Utilisation</div>
+      <div class="stat-val a" id="util">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Your Deposit</div>
+      <div class="stat-val g" id="yourDeposit">—</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- LEFT -->
+    <div class="pool-info">
+      <div class="section-title">Pool Status</div>
+      <div class="info-row"><span class="info-label">Total Deposits</span><span class="info-val g" id="totalDep">—</span></div>
+      <div class="info-row"><span class="info-label">Available Liquidity</span><span class="info-val" id="avail">—</span></div>
+      <div class="info-row"><span class="info-label">Currently Borrowed</span><span class="info-val a" id="borrowed">—</span></div>
+      <div class="info-row"><span class="info-label">Max Borrowable (80%)</span><span class="info-val" id="maxBorrow">—</span></div>
+      <div class="info-row">
+        <span class="info-label">Utilisation Rate</span>
+        <span class="info-val a" id="utilRate">—</span>
+      </div>
+      <div class="util-track"><div class="util-fill" id="utilFill" style="width:0%"></div></div>
+
+      <div class="section-title" style="margin-top:24px">Your Position</div>
+      <div class="info-row"><span class="info-label">Your USDC Balance</span><span class="info-val" id="usdcBal">—</span></div>
+      <div class="info-row"><span class="info-label">Your LP Shares</span><span class="info-val" id="lpShares">—</span></div>
+      <div class="info-row"><span class="info-label">Share Value</span><span class="info-val g" id="shareVal">—</span></div>
+
+      <div class="section-title" style="margin-top:24px">How It Works</div>
+      <div class="how-grid">
+        <div class="how-card">
+          <div class="how-num">01</div>
+          <div class="how-title">Deposit USDC</div>
+          <div class="how-desc">Deposit any amount of USDC into the pool and receive LP shares proportional to your contribution.</div>
+        </div>
+        <div class="how-card">
+          <div class="how-num">02</div>
+          <div class="how-title">Back Flash Trades</div>
+          <div class="how-desc">Traders borrow from your pool to open flash positions. They pay 0.3% borrow fee per trade.</div>
+        </div>
+        <div class="how-card">
+          <div class="how-num">03</div>
+          <div class="how-title">Earn Fees</div>
+          <div class="how-desc">Borrow fees accumulate in the pool, increasing your share value automatically. No claiming needed.</div>
+        </div>
+        <div class="how-card">
+          <div class="how-num">04</div>
+          <div class="how-title">Withdraw Anytime</div>
+          <div class="how-desc">Burn your LP shares to withdraw USDC + accumulated yield. No lock-up period on testnet.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding:14px;background:var(--raised);border:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.7;font-family:var(--mono)">
+        ⚠ Testnet only. LP deposits are protected by the insurance fund and utilisation ceiling (max 80% borrowed). In extreme market conditions, bad debt may reduce LP returns.
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="deposit-form">
+      <div class="section-title">Manage Position</div>
+
+      <div class="tab-switch">
+        <button class="tab-btn active" id="depositTab" onclick="setTab('deposit')">Deposit</button>
+        <button class="tab-btn" id="withdrawTab" onclick="setTab('withdraw')">Withdraw</button>
+      </div>
+
+      <div class="field" id="depositField">
+        <div class="field-label">Amount <span id="maxLabel">Balance: —</span></div>
+        <div class="field-row">
+          <input type="number" class="field-input" id="amountInput" placeholder="0.00" min="1" step="100" oninput="updateSummary()">
+          <div class="field-suf" id="inputSuf">USDC</div>
+        </div>
+        <div class="pct-btns">
+          <button class="pct-btn" onclick="setPct(25)">25%</button>
+          <button class="pct-btn" onclick="setPct(50)">50%</button>
+          <button class="pct-btn" onclick="setPct(75)">75%</button>
+          <button class="pct-btn" onclick="setPct(100)">MAX</button>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="sum-row"><span>Amount</span><span class="val" id="sumAmount">—</span></div>
+        <div class="sum-row"><span id="sumLabel2">LP Shares to Receive</span><span class="val" id="sumShares">—</span></div>
+        <div class="sum-row"><span>Pool Share</span><span class="val" id="sumPoolShare">—</span></div>
+        <div class="sum-row total"><span id="sumTotalLabel">Total Deposit Value</span><span class="val" id="sumTotal">—</span></div>
+      </div>
+
+      <button class="action-btn" id="actionBtn" onclick="doAction()" disabled>Connect Wallet First</button>
+
+      <button class="mint-btn" id="mintBtn" onclick="mintUSDC()">+ Mint 10,000 Test USDC</button>
+
+      <div class="footnote">
+        LP shares appreciate as borrow fees accumulate. Withdraw at any time to receive your proportional share of the pool including all earned fees.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TX Overlay -->
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <div class="overlay-msg" id="overlayMsg">Processing...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const RPC_URL = 'https://arb-mainnet.g.alchemy.com/v2/KZEFKPM5lG0ewvC1izG6b';
+const CHAIN_ID = 42161;
+
+const CONTRACTS = {
+  USDC:          '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+  LiquidityPool: '0xBF3b8A480CCc90aF756Af179F7D11092eE746EA1',
+};
+
+const ABI = {
+  USDC: [
+    'function balanceOf(address) view returns (uint256)',
+    'function approve(address,uint256) returns (bool)',
+    'function allowance(address,address) view returns (uint256)',
+    'function mint(address,uint256)',
+  ],
+  Pool: [
+    'function totalDeposits() view returns (uint256)',
+    'function totalBorrowed() view returns (uint256)',
+    'function availableLiquidity() view returns (uint256)',
+    'function utilisationRate() view returns (uint256)',
+    'function maxBorrowable() view returns (uint256)',
+    'function lpShares(address) view returns (uint256)',
+    'function totalShares() view returns (uint256)',
+    'function lpValue(address) view returns (uint256)',
+    'function deposit(uint256)',
+    'function withdraw(uint256)',
+  ],
+};
+
+let provider, signer, userAddr, C = {};
+let tab = 'deposit';
+let poolData = { totalDep: 0n, totalShares: 0n, usdcBal: 0n, lpShares: 0n, lpValue: 0n };
+
+const fmt = (n, dec=6) => '$' + parseFloat(ethers.formatUnits(n, dec)).toLocaleString('en-US', {maximumFractionDigits: 0});
+const fmtPct = n => (Number(n) / 1e16).toFixed(1) + '%';
+const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+async function connectWallet() {
+  if (!window.ethereum) { toast('MetaMask not found', 'err'); return; }
+  try {
+    showOverlay('Connecting...');
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    userAddr = await signer.getAddress();
+
+    const net = await provider.getNetwork();
+    if (Number(net.chainId) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + CHAIN_ID.toString(16) }] });
+      } catch {
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x' + CHAIN_ID.toString(16), chainName: 'Arbitrum One', rpcUrls: [RPC_URL], nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }] });
+      }
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      userAddr = await signer.getAddress();
+    }
+
+    C.usdc = new ethers.Contract(CONTRACTS.USDC, ABI.USDC, signer);
+    C.pool = new ethers.Contract(CONTRACTS.LiquidityPool, ABI.Pool, signer);
+
+    const short = userAddr.slice(0,6) + '...' + userAddr.slice(-4);
+    document.getElementById('connectBtn').textContent = short;
+    document.getElementById('connectBtn').classList.add('connected');
+    document.getElementById('actionBtn').disabled = false;
+    document.getElementById('actionBtn').textContent = '⚡ Deposit USDC';
+    document.getElementById('mintBtn').style.display = 'block';
+
+    hideOverlay();
+    toast('Connected: ' + short);
+    await refreshAll();
+    setInterval(refreshAll, 10000);
+  } catch(e) {
+    hideOverlay();
+    toast(e.message?.slice(0,80) || 'Failed', 'err');
+  }
+}
+
+async function refreshAll() {
+  if (!C.pool) return;
+  try {
+    const [totalDep, totalBorr, avail, util, maxB, usdcBal, lpShares, lpValue, totalShares] = await Promise.all([
+      C.pool.totalDeposits(), C.pool.totalBorrowed(),
+      C.pool.availableLiquidity(), C.pool.utilisationRate(),
+      C.pool.maxBorrowable(), C.usdc.balanceOf(userAddr),
+      C.pool.lpShares(userAddr), C.pool.lpValue(userAddr),
+      C.pool.totalShares(),
+    ]);
+
+    poolData = { totalDep, totalShares, usdcBal, lpShares, lpValue };
+
+    const utilPct = (Number(util) / 1e16).toFixed(1);
+
+    set('tvl', fmt(totalDep));
+    set('util', utilPct + '%');
+    set('yourDeposit', fmt(lpValue));
+    set('totalDep', fmt(totalDep));
+    set('avail', fmt(avail));
+    set('borrowed', fmt(totalBorr));
+    set('maxBorrow', fmt(maxB));
+    set('utilRate', utilPct + '%');
+    document.getElementById('utilFill').style.width = Math.min(parseFloat(utilPct), 100) + '%';
+
+    set('usdcBal', fmt(usdcBal));
+    set('lpShares', parseFloat(ethers.formatUnits(lpShares, 6)).toLocaleString('en-US', {maximumFractionDigits: 0}));
+    set('shareVal', fmt(lpValue));
+
+    // Max label
+    const maxLabel = tab === 'deposit'
+      ? 'Balance: ' + fmt(usdcBal)
+      : 'Shares: ' + parseFloat(ethers.formatUnits(lpShares, 6)).toLocaleString('en-US', {maximumFractionDigits: 0});
+    set('maxLabel', maxLabel);
+
+    updateSummary();
+  } catch(e) { console.error(e); }
+}
+
+function setTab(t) {
+  tab = t;
+  document.getElementById('depositTab').classList.toggle('active', t === 'deposit');
+  document.getElementById('withdrawTab').classList.toggle('active', t === 'withdraw');
+  document.getElementById('amountInput').value = '';
+  document.getElementById('inputSuf').textContent = t === 'deposit' ? 'USDC' : 'SHARES';
+  document.getElementById('actionBtn').className = 'action-btn' + (t === 'withdraw' ? ' withdraw' : '');
+  document.getElementById('actionBtn').textContent = t === 'deposit' ? '⚡ Deposit USDC' : '↩ Withdraw USDC';
+  document.getElementById('sumLabel2').textContent = t === 'deposit' ? 'LP Shares to Receive' : 'USDC to Receive';
+  document.getElementById('sumTotalLabel').textContent = t === 'deposit' ? 'Total Deposit Value' : 'Total Withdrawal';
+  if (userAddr) refreshAll();
+  updateSummary();
+}
+
+function setPct(pct) {
+  if (!userAddr) return;
+  const max = tab === 'deposit'
+    ? parseFloat(ethers.formatUnits(poolData.usdcBal, 6))
+    : parseFloat(ethers.formatUnits(poolData.lpShares, 6));
+  document.getElementById('amountInput').value = ((max * pct) / 100).toFixed(2);
+  updateSummary();
+}
+
+function updateSummary() {
+  const amt = parseFloat(document.getElementById('amountInput').value) || 0;
+  if (!amt) {
+    ['sumAmount','sumShares','sumPoolShare','sumTotal'].forEach(id => set(id, '—'));
+    return;
+  }
+
+  const totalDep = parseFloat(ethers.formatUnits(poolData.totalDep || 0n, 6));
+  const totalShares = parseFloat(ethers.formatUnits(poolData.totalShares || 0n, 6));
+
+  if (tab === 'deposit') {
+    const sharesOut = totalShares > 0 ? (amt / totalDep) * totalShares : amt;
+    const poolShare = totalDep > 0 ? ((amt / (totalDep + amt)) * 100).toFixed(2) : '100.00';
+    set('sumAmount', '$' + amt.toLocaleString('en-US', {maximumFractionDigits: 0}));
+    set('sumShares', sharesOut.toLocaleString('en-US', {maximumFractionDigits: 0}));
+    set('sumPoolShare', poolShare + '%');
+    set('sumTotal', '$' + amt.toLocaleString('en-US', {maximumFractionDigits: 0}));
+  } else {
+    const usdcOut = totalShares > 0 ? (amt / totalShares) * totalDep : 0;
+    const poolShare = totalShares > 0 ? ((amt / totalShares) * 100).toFixed(2) : '0.00';
+    set('sumAmount', amt.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' shares');
+    set('sumShares', '$' + usdcOut.toLocaleString('en-US', {maximumFractionDigits: 0}));
+    set('sumPoolShare', poolShare + '%');
+    set('sumTotal', '$' + usdcOut.toLocaleString('en-US', {maximumFractionDigits: 0}));
+  }
+}
+
+async function doAction() {
+  if (!signer) { toast('Connect wallet first', 'err'); return; }
+  const amt = parseFloat(document.getElementById('amountInput').value);
+  if (!amt || amt <= 0) { toast('Enter an amount', 'err'); return; }
+
+  if (tab === 'deposit') {
+    await doDeposit(amt);
+  } else {
+    await doWithdraw(amt);
+  }
+}
+
+async function doDeposit(amt) {
+  const amount = ethers.parseUnits(amt.toString(), 6);
+  try {
+    showOverlay('Checking allowance...');
+    const allowance = await C.usdc.allowance(userAddr, CONTRACTS.LiquidityPool);
+    if (allowance < amount) {
+      showOverlay('Approving USDC...');
+      const tx = await C.usdc.approve(CONTRACTS.LiquidityPool, ethers.MaxUint256);
+      await tx.wait();
+    }
+    showOverlay('Depositing...');
+    const tx = await C.pool.deposit(amount, { gasLimit: 200000 });
+    await tx.wait();
+    hideOverlay();
+    document.getElementById('amountInput').value = '';
+    toast('Deposited $' + amt.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' USDC ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || e?.message?.slice(0,80) || 'Deposit failed', 'err');
+  }
+}
+
+async function doWithdraw(shares) {
+  const sharesAmt = ethers.parseUnits(shares.toString(), 6);
+  try {
+    showOverlay('Withdrawing...');
+    const tx = await C.pool.withdraw(sharesAmt, { gasLimit: 200000 });
+    await tx.wait();
+    hideOverlay();
+    document.getElementById('amountInput').value = '';
+    toast('Withdrawal successful ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || e?.message?.slice(0,80) || 'Withdrawal failed', 'err');
+  }
+}
+
+async function mintUSDC() {
+  if (!signer) return;
+  try {
+    showOverlay('Minting 10,000 USDC...');
+    const tx = await C.usdc.mint(userAddr, ethers.parseUnits('10000', 6));
+    await tx.wait();
+    hideOverlay();
+    toast('10,000 test USDC minted ✓');
+    await refreshAll();
+  } catch(e) {
+    hideOverlay();
+    toast(e?.reason || 'Mint failed', 'err');
+  }
+}
+
+let toastTimer;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = 'toast', 4000);
+}
+function showOverlay(msg) { set('overlayMsg', msg); document.getElementById('overlay').classList.add('on'); }
+function hideOverlay() { document.getElementById('overlay').classList.remove('on'); }
+</script>
+</body>
+</html>
