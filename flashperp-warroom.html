@@ -776,7 +776,7 @@ async function connectWallet() {
     document.getElementById('netTag').style.display = 'block';
     document.getElementById('execBtn').disabled = false;
     document.getElementById('execBtn').textContent = '⚡ Execute Long';
-    document.getElementById('mintBtn').style.display = 'block';
+    // mintBtn hidden on mainnet
 
     hideOverlay();
     toast('Connected: ' + short);
