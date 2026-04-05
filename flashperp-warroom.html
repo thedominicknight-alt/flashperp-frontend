@@ -1071,6 +1071,40 @@ async function openPosition() {
       await tx.wait();
     }
     showOverlay('Opening position...');
+    // Fetch fresh Pyth price update and include in tx
+    let pythUpdateData = [];
+    let pythFee = 0n;
+    try {
+      const priceIds = [
+        '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+        '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+        '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d',
+        '0xa995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b',
+        '0x765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2',
+      ];
+      const hermesUrl = 'https://hermes.pyth.network/v2/updates/price/latest?' + priceIds.map(id => 'ids[]=' + id).join('&');
+      const hermesRes = await fetch(hermesUrl);
+      const hermesData = await hermesRes.json();
+      pythUpdateData = hermesData.binary.data.map(d => '0x' + d);
+      const pythContract = new ethers.Contract(
+        '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+        ['function getUpdateFee(bytes[] calldata) view returns (uint256)'],
+        provider
+      );
+      pythFee = await pythContract.getUpdateFee(pythUpdateData);
+      // Update prices on-chain first
+      const pythWrite = new ethers.Contract(
+        '0xff1a0f4744e8582DF1aE09D5611b887B6a12925C',
+        ['function updatePriceFeeds(bytes[] calldata) payable'],
+        signer
+      );
+      const updateTx = await pythWrite.updatePriceFeeds(pythUpdateData, { value: pythFee, gasLimit: 500000 });
+      await updateTx.wait();
+      toast('Oracle updated ✓');
+    } catch(e) {
+      console.warn('Pyth update failed, trying anyway:', e.message);
+    }
+
     const tx = await C.pm.openPosition(mktId, borrowed, leverage, S.dir==='long', S.dur);
     showOverlay('Confirming...');
     await tx.wait();
